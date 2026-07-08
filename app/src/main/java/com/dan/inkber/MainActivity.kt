@@ -1,12 +1,10 @@
 package com.dan.inkber
 
-import android.Manifest
 import android.annotation.SuppressLint
-import android.app.AlertDialog
 import android.content.Intent
-import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Bundle
+import android.util.Log
 import android.view.View
 import android.view.WindowManager
 import android.webkit.WebView
@@ -33,12 +31,11 @@ class MainActivity : AppCompatActivity() {
         EATS("https://www.ubereats.com")
     }
 
-    private val requestLocationPermission =
-        registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-            if (granted) {
+    private val locationPromptResult =
+        registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+            Log.d(TAG, "LocationPrompt result: ${result.resultCode}")
+            if (result.resultCode == RESULT_OK) {
                 injectLocationIntoActiveWebView()
-            } else {
-                prefs.locationPromptState = Prefs.PROMPT_NEVER_ASK
             }
         }
 
@@ -86,6 +83,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
+        Log.d(TAG, "onResume: shouldShowPrompt=${prefs.shouldShowLocationPrompt()} promptState=${prefs.locationPromptState} hasPerm=${locationProvider.hasPermission()}")
         configureWebView(ridesWebView)
         configureWebView(eatsWebView)
         applyKeepScreenOn(inTrip && prefs.screenOnDuringTrip)
@@ -178,32 +176,9 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun showLocationOptInDialog() {
+        Log.d(TAG, "showLocationOptInDialog: launching LocationPromptActivity")
         prefs.locationPromptState = Prefs.PROMPT_SHOWN_AWAITING
-        val dialog = AlertDialog.Builder(this, android.R.style.Theme_Material_Light_Dialog_Alert)
-            .setTitle(R.string.location_dialog_title)
-            .setMessage(R.string.location_dialog_message)
-            .setPositiveButton(R.string.location_dialog_allow) { _, _ ->
-                requestLocationPermission.launch(Manifest.permission.ACCESS_FINE_LOCATION)
-            }
-            .setNegativeButton(R.string.location_dialog_not_now) { _, _ ->
-                prefs.locationPromptState = Prefs.PROMPT_NOT_SHOWN
-            }
-            .setNeutralButton(R.string.location_dialog_never) { _, _ ->
-                prefs.locationPromptState = Prefs.PROMPT_NEVER_ASK
-            }
-            .setCancelable(false)
-            .create()
-        dialog.setOnShowListener {
-            // Explicitly set button text colors so all three buttons are
-            // visible on the e-ink display. The Material theme renders
-            // negative/neutral buttons as black text-buttons that are
-            // invisible on a black background on e-ink.
-            val black = 0xFF111111.toInt()
-            dialog.getButton(AlertDialog.BUTTON_POSITIVE)?.setTextColor(black)
-            dialog.getButton(AlertDialog.BUTTON_NEGATIVE)?.setTextColor(black)
-            dialog.getButton(AlertDialog.BUTTON_NEUTRAL)?.setTextColor(black)
-        }
-        dialog.show()
+        locationPromptResult.launch(Intent(this, LocationPromptActivity::class.java))
     }
 
     @SuppressLint("SetTextI18n")
@@ -218,18 +193,8 @@ class MainActivity : AppCompatActivity() {
         )
     }
 
-    override fun onRequestPermissionsResult(
-        requestCode: Int,
-        permissions: Array<out String>,
-        grantResults: IntArray
-    ) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        val granted = grantResults.isNotEmpty() &&
-            grantResults[0] == PackageManager.PERMISSION_GRANTED
-        if (granted) injectLocationIntoActiveWebView()
-    }
-
     companion object {
+        private const val TAG = "Inkber"
         private const val KEY_RIDES_STATE = "rides_state"
         private const val KEY_EATS_STATE = "eats_state"
         private const val KEY_ACTIVE_TAB = "active_tab"

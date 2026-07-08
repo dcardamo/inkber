@@ -17,14 +17,14 @@
           };
         };
 
-        # Compose an Android SDK with exactly the components we need.
-        # No emulator, no system images - we test via Robolectric (JVM) and
-        # headless Chromium for WebView content, so no KVM required.
+        # Compose an Android SDK with emulator + system image for testing.
         composed = pkgs.androidenv.composeAndroidPackages {
           platformVersions = [ "34" ];
           buildToolsVersions = [ "34.0.0" ];
-          includeEmulator = false;
-          includeSystemImages = false;
+          includeEmulator = true;
+          includeSystemImages = true;
+          systemImageTypes = [ "google_apis" ];
+          abiVersions = [ "x86_64" ];
           includeNDK = false;
         };
 
@@ -34,7 +34,6 @@
         # JDK version required by AGP 8.x.
         jdk = pkgs.jdk17;
 
-        # Build tools needed alongside the SDK for screenshots/tests.
         nativeBuildInputs = with pkgs; [
           gradle
           jdk
@@ -43,6 +42,8 @@
           chromium
           # E-ink post-processing of screenshots.
           imagemagick
+          # Virtual framebuffer for headless emulator.
+          xvfb
           # Used by Robolectric to find android-all jars if needed.
           pkgs.which
         ];
@@ -52,23 +53,17 @@
         devShells.default = pkgs.mkShell rec {
           inherit nativeBuildInputs;
 
-          # Android SDK expects ANDROID_SDK_ROOT / ANDROID_HOME.
           ANDROID_SDK_ROOT = androidSdkRoot;
           ANDROID_HOME = androidSdkRoot;
 
-          # Gradle + Android toolchain.
           JAVA_HOME = "${jdk}/lib/openjdk";
           GRADLE_OPTS = "-Dorg.gradle.daemon=false -Dorg.gradle.configureondemand=true";
 
-          # Chromium sandboxing is hostile to nix shells; run it headless.
           CHROMIUM_FLAGS = "--no-sandbox --headless --disable-gpu";
 
-          # Make androidSdk components discoverable by AGP.
           ANDROID_NDK_HOME = "";
         };
 
-        # Convenience: a package that just builds the debug APK via nix build.
-        # Not the primary path (./gradlew is), but handy for `nix build .#apk`.
         packages.apk = pkgs.stdenv.mkDerivation {
           name = "inkber-debug-apk";
           src = ./.;

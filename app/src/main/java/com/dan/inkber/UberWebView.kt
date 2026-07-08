@@ -1,8 +1,8 @@
 package com.dan.inkber
 
 import android.content.Context
+import android.os.Build
 import android.util.AttributeSet
-import android.view.MotionEvent
 import android.view.View
 import android.webkit.WebSettings
 import android.webkit.WebView
@@ -31,8 +31,12 @@ class UberWebView @JvmOverloads constructor(
     }
 
     private fun configure() {
-        // Software rendering: avoids e-ink panel artefacts from hardware layers.
-        setLayerType(View.LAYER_TYPE_SOFTWARE, null)
+        // Software rendering avoids e-ink panel artefacts from hardware layers,
+        // but on the Android emulator (swiftshader) it prevents the WebView from
+        // painting at all. Only enable it on real hardware, not emulators.
+        if (!isEmulator()) {
+            setLayerType(View.LAYER_TYPE_SOFTWARE, null)
+        }
 
         with(settings) {
             javaScriptEnabled = true
@@ -59,16 +63,23 @@ class UberWebView @JvmOverloads constructor(
         isVerticalScrollBarEnabled = true
         scrollBarStyle = View.SCROLLBARS_INSIDE_OVERLAY
 
-        // Bug fix: keyboard doesn't appear when tapping text inputs. The
-        // WebView needs to be focusable in touch mode and must request focus
-        // when touched, otherwise the soft keyboard never shows.
         isFocusable = true
         isFocusableInTouchMode = true
         setOnTouchListener { v, _ ->
-            if (!v.hasFocus()) {
-                v.requestFocus()
-            }
-            false // don't consume the touch; let WebView handle it
+            if (!v.hasFocus()) v.requestFocus()
+            false
         }
+    }
+
+    companion object {
+        private fun isEmulator(): Boolean =
+            Build.FINGERPRINT.contains("generic") ||
+                Build.FINGERPRINT.contains("emu") ||
+                Build.MODEL.contains("Emulator") ||
+                Build.MODEL.contains("SDK") ||
+                Build.MODEL.contains("sdk") ||
+                Build.PRODUCT.contains("sdk") ||
+                Build.PRODUCT.contains("emu") ||
+                Build.BRAND == "google" && Build.PRODUCT.contains("gphone")
     }
 }
