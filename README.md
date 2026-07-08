@@ -53,8 +53,9 @@ GitHub Releases. In Obtainium, add a new app with these settings:
 | APK filter          | `inkber.*\.apk`                    |
 
 Obtainium will track new tags and offer updates automatically. The APK is
-unsigned; Android will prompt you once to allow installs from the source
-you used to fetch it (e.g. Obtainium or your file manager).
+signed with a self-signed certificate (APK Signature Scheme v2). Android will
+prompt you once to allow installs from the source you used to fetch it
+(e.g. Obtainium or your file manager).
 
 ### Via APK from GitHub Releases
 
@@ -90,7 +91,7 @@ The debug APK is written to
 
 ### Creating a release
 
-CI automatically builds and attaches an unsigned APK to a GitHub Release when
+CI automatically builds, signs, and attaches an APK to a GitHub Release when
 you push a tag:
 
 ```sh
