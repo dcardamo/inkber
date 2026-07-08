@@ -19,20 +19,22 @@ class EinkInjectorTest {
             "animation: none",
             "transition: none",
             "line-height: 1.5",
-            "__inkberInjected"
+            "__inkberInjected",
+            "MutationObserver"
         ).forEach {
             assertTrue("CSS missing: $it", css.contains(it))
         }
     }
 
     @Test fun cssFontBoostApplied() {
+        // 25% boost: 16px * 1.25 = 20px
         val css = EinkInjector.css(fontBoostPercent = 25)
-        assertTrue(css.contains("25% larger"))
+        assertTrue("expected 20px root font-size for 25% boost", css.contains("font-size: 20.0px"))
     }
 
     @Test fun cssFontBoostClampedLow() {
         val css = EinkInjector.css(fontBoostPercent = 0)
-        assertTrue(css.contains("0% larger"))
+        assertTrue("expected 16px root font-size for 0% boost", css.contains("font-size: 16.0px"))
     }
 
     @Test fun cssFontBoostOutOfRangeThrows() {
@@ -140,5 +142,36 @@ class EinkInjectorTest {
         val css = EinkInjector.css()
         val guardCount = Regex("window\\.__inkberInjected").findAll(css).count()
         assertTrue("Expected idempotency guard", guardCount >= 2)
+    }
+
+    @Test fun cssTextIsPureCss() {
+        // cssText should be pure CSS, no JS wrapper.
+        val css = EinkInjector.cssText(15)
+        assertFalse("cssText should not contain JS", css.contains("(function"))
+        assertFalse("cssText should not contain IIFE", css.contains("__inkberInjected"))
+        assertTrue("cssText should contain line-height", css.contains("line-height: 1.5"))
+    }
+
+    @Test fun cssTextFontBoostCalculation() {
+        // 15% boost: 16 * 1.15 = 18.4
+        val css = EinkInjector.cssText(15)
+        assertTrue("expected 18.4px for 15% boost", css.contains("font-size: 18.4px"))
+    }
+
+    @Test fun cssContainsMutationObserver() {
+        val css = EinkInjector.css()
+        assertTrue("CSS must include MutationObserver for SPA re-injection",
+            css.contains("MutationObserver"))
+        assertTrue("CSS must observe subtree changes",
+            css.contains("subtree: true"))
+    }
+
+    @Test fun cssResetsInjectionGuardOnNewPageLoad() {
+        // The WebViewClient resets the guard on onPageStarted so CSS
+        // re-injects after navigation. Verify the css() function itself
+        // has the guard (idempotent within a page), and the reset logic
+        // is in the client (tested separately).
+        val css = EinkInjector.css()
+        assertTrue("must check existing injection", css.contains("if (window.__inkberInjected)"))
     }
 }

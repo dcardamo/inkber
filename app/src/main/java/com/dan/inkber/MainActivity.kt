@@ -179,7 +179,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun showLocationOptInDialog() {
         prefs.locationPromptState = Prefs.PROMPT_SHOWN_AWAITING
-        AlertDialog.Builder(this, android.R.style.Theme_Material_Light_Dialog_Alert)
+        val dialog = AlertDialog.Builder(this, android.R.style.Theme_Material_Light_Dialog_Alert)
             .setTitle(R.string.location_dialog_title)
             .setMessage(R.string.location_dialog_message)
             .setPositiveButton(R.string.location_dialog_allow) { _, _ ->
@@ -192,7 +192,18 @@ class MainActivity : AppCompatActivity() {
                 prefs.locationPromptState = Prefs.PROMPT_NEVER_ASK
             }
             .setCancelable(false)
-            .show()
+            .create()
+        dialog.setOnShowListener {
+            // Explicitly set button text colors so all three buttons are
+            // visible on the e-ink display. The Material theme renders
+            // negative/neutral buttons as black text-buttons that are
+            // invisible on a black background on e-ink.
+            val black = 0xFF111111.toInt()
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE)?.setTextColor(black)
+            dialog.getButton(AlertDialog.BUTTON_NEGATIVE)?.setTextColor(black)
+            dialog.getButton(AlertDialog.BUTTON_NEUTRAL)?.setTextColor(black)
+        }
+        dialog.show()
     }
 
     @SuppressLint("SetTextI18n")

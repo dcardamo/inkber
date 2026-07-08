@@ -29,12 +29,8 @@ class EinkCssDumpTest {
         }
         dir.mkdirs()
 
-        // Extract just the CSS text from the IIFE wrapper.
-        val js = EinkInjector.css(15)
-        val marker = "s.textContent = `"
-        val start = js.indexOf(marker) + marker.length
-        val end = js.indexOf("`;", start)
-        val pureCss = js.substring(start, end)
+        // Use cssText() directly — it's pure CSS without the JS wrapper.
+        val pureCss = EinkInjector.cssText(15)
         File(dir, "eink.css").writeText(pureCss)
 
         // Build a representative mobile login page. Generic, not copied from Uber.
@@ -216,7 +212,7 @@ class EinkCssDumpTest {
     <div class="item info">
       <div class="text">
         <div class="title">Version</div>
-        <div class="summary">0.1.2</div>
+        <div class="summary">0.1.3</div>
       </div>
     </div>
     <div class="item info">

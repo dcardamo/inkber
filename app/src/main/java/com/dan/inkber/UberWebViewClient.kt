@@ -13,6 +13,11 @@ import java.io.ByteArrayInputStream
  * Decides which URLs the WebView is allowed to load, blocks ad/tracker hosts,
  * keeps navigation inside the in-app WebView for Uber domains, and injects the
  * e-ink stylesheet after each page finishes loading.
+ *
+ * Uses onPageCommitVisible (API 23+) for the initial CSS injection because
+ * Uber is a JS SPA that renders content after onPageFinished. The CSS
+ * injection script also sets up a MutationObserver to re-inject when Uber's
+ * JS dynamically adds DOM nodes.
  */
 class UberWebViewClient(
     private val einkEnabled: () -> Boolean,
@@ -48,17 +53,32 @@ class UberWebViewClient(
     override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
         super.onPageStarted(view, url, favicon)
         url?.let { onTripStateChange(isTripUrl(it)) }
+        // Reset the injection guard so CSS re-injects on each new page load.
+        view?.evaluateJavascript(
+            "try{delete window.__inkberInjected;if(window.__inkberObserver){window.__inkberObserver.disconnect();delete window.__inkberObserver;}}catch(e){}", null
+        )
+    }
+
+    override fun onPageCommitVisible(view: WebView?, url: String?) {
+        super.onPageCommitVisible(view, url)
+        // This fires after the page is visually rendered — better timing for
+        // Uber's SPA which renders most content via JS after onPageFinished.
+        injectEinkAndLocation(view, url)
     }
 
     override fun onPageFinished(view: WebView?, url: String?) {
         super.onPageFinished(view, url)
+        // Also inject on onPageFinished as a fallback for pages where
+        // onPageCommitVisible didn't fire or fired too early.
+        injectEinkAndLocation(view, url)
+    }
+
+    private fun injectEinkAndLocation(view: WebView?, url: String?) {
         if (view == null || url == null) return
         if (!EinkInjector.isInternal(url)) return
         if (einkEnabled() && EinkInjector.shouldInject(url)) {
             view.evaluateJavascript(EinkInjector.css(fontBoostPercent()), null)
         }
-        // Re-inject location override on every page load so navigation between
-        // login pages and sub-pages doesn't lose the navigator.geolocation patch.
         onLocationReady()
     }
 

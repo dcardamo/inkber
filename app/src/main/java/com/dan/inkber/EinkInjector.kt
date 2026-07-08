@@ -49,63 +49,99 @@ object EinkInjector {
     )
 
     /**
-     * The e-ink stylesheet. Injected once per page load via a <style> element.
-     * Written defensively (!important) because Uber's own CSS is high-specificity.
+     * The e-ink CSS as pure stylesheet text (no JS wrapper). Used by the
+     * MutationObserver re-injection and the initial injection.
+     */
+    fun cssText(fontBoostPercent: Int = 15): String {
+        require(fontBoostPercent in 0..100) { "fontBoostPercent out of range: $fontBoostPercent" }
+        // Use a fixed rem-based boost instead of "% larger" which compounds
+        // unpredictably across nested elements. A 15% boost = 1.15rem base.
+        val rootFontSize = (16 * (1 + fontBoostPercent.toDouble() / 100.0)).toString()
+        return """
+            :root { color-scheme: light only !important; font-size: ${rootFontSize}px !important; }
+            html, body {
+              background: #ffffff !important;
+              color: #111111 !important;
+              color-scheme: light only !important;
+              line-height: 1.5 !important;
+            }
+            * {
+              animation: none !important;
+              transition: none !important;
+              scroll-behavior: auto !important;
+              line-height: 1.5 !important;
+            }
+            body, p, span, div, li, td, th, label, button, a, input, select, textarea, h1, h2, h3, h4, h5, h6 {
+              color: #111111 !important;
+              line-height: 1.5 !important;
+              text-rendering: optimizeLegibility !important;
+              -webkit-font-smoothing: none !important;
+            }
+            a { color: #000000 !important; text-decoration: underline !important; }
+            input, select, textarea, button {
+              background: #ffffff !important;
+              border-color: #888888 !important;
+              color: #111111 !important;
+            }
+            img { filter: grayscale(1) contrast(1.08) !important; }
+            [role='dialog'], [role='alertdialog'] {
+              background: #ffffff !important;
+              color: #111111 !important;
+              border: 1px solid #888888 !important;
+            }
+            [style*='blur'], [style*='gradient'], [style*='backdrop-filter'] {
+              background: #ffffff !important;
+              box-shadow: none !important;
+              backdrop-filter: none !important;
+              filter: none !important;
+            }
+            button[style*='background'], .btn, [class*='primary'] {
+              filter: grayscale(0.35) contrast(1.05) !important;
+            }
+            video, [class*='video'], [class*='carousel'] { display: none !important; }
+            @media (prefers-color-scheme: dark) {
+              html, body, div, span, p, * {
+                background: #ffffff !important;
+                color: #111111 !important;
+              }
+            }
+        """.trimIndent()
+    }
+
+    /**
+     * The full JS injection script. Injects the CSS AND sets up a
+     * MutationObserver to re-inject it when Uber's SPA dynamically adds
+     * content. Uber is a JS-heavy single-page app that renders most of its
+     * DOM after onPageFinished, so a one-shot CSS injection is not enough.
      */
     fun css(fontBoostPercent: Int = 15): String {
         require(fontBoostPercent in 0..100) { "fontBoostPercent out of range: $fontBoostPercent" }
-        val boost = "${fontBoostPercent.coerceAtLeast(0)}%"
+        val css = cssText(fontBoostPercent).replace("\n", "\\n").replace("'", "\\'")
         return """
             (function(){
               if (window.__inkberInjected) return;
               window.__inkberInjected = true;
-              var s = document.createElement('style');
-              s.id = 'inkber-eink';
-              s.textContent = `
-                :root { color-scheme: light only !important; }
-                html, body {
-                  background: #ffffff !important;
-                  color: #111111 !important;
-                  color-scheme: light only !important;
-                }
-                * {
-                  animation: none !important;
-                  transition: none !important;
-                  scroll-behavior: auto !important;
-                }
-                body, p, span, div, li, td, th, label, button, a, input, select, textarea, h1, h2, h3, h4, h5, h6 {
-                  color: #111111 !important;
-                  font-size: ${boost} larger;
-                  line-height: 1.5 !important;
-                  text-rendering: optimizeLegibility !important;
-                  -webkit-font-smoothing: none !important;
-                }
-                a { color: #000000 !important; text-decoration: underline !important; }
-                input, select, textarea, button {
-                  background: #ffffff !important;
-                  border-color: #888888 !important;
-                  color: #111111 !important;
-                }
-                img { filter: grayscale(1) contrast(1.08) !important; }
-                [role='dialog'], [role='alertdialog'] {
-                  background: #ffffff !important;
-                  color: #111111 !important;
-                  border: 1px solid #888888 !important;
-                }
-                [style*='blur'], [style*='gradient'], [style*='backdrop-filter'] {
-                  background: #ffffff !important;
-                  box-shadow: none !important;
-                  backdrop-filter: none !important;
-                }
-                button[style*='background'], .btn, [class*='primary'] {
-                  filter: grayscale(0.35) contrast(1.05) !important;
-                }
-                video, [class*='video'], [class*='carousel'] { display: none !important; }
-                @media (prefers-color-scheme: dark) {
-                  html, body, div, span, p { background: #ffffff !important; color: #111111 !important; }
-                }
-              `;
-              (document.head || document.documentElement).appendChild(s);
+              var cssStr = '$css';
+              function injectStyle() {
+                if (document.getElementById('inkber-eink')) return;
+                var s = document.createElement('style');
+                s.id = 'inkber-eink';
+                s.textContent = cssStr;
+                (document.head || document.documentElement).appendChild(s);
+              }
+              injectStyle();
+              // Re-inject when Uber's SPA adds/removes DOM nodes.
+              if (window.__inkberObserver) return;
+              var observer = new MutationObserver(function(mutations) {
+                injectStyle();
+              });
+              if (document.documentElement) {
+                observer.observe(document.documentElement, {
+                  childList: true,
+                  subtree: true
+                });
+              }
+              window.__inkberObserver = observer;
             })();
         """.trimIndent()
     }
@@ -136,9 +172,7 @@ object EinkInjector {
                 },
                 timestamp: Date.now()
               };
-              var err = { code: 1, message: 'Location not available' };
               if (navigator.geolocation) {
-                var orig = navigator.geolocation.getCurrentPosition.bind(navigator.geolocation);
                 navigator.geolocation.getCurrentPosition = function(success, failure, opts) {
                   success(pos);
                 };
