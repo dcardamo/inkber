@@ -28,7 +28,8 @@ class UberWebViewClient(
     private val fontBoostPercent: () -> Int,
     private val onExternalUrl: (String) -> Unit,
     private val onTripStateChange: (Boolean) -> Unit,
-    private val onLocationReady: () -> Unit = {}
+    private val onLocationReady: () -> Unit = {},
+    private val internalUrls: Set<String> = emptySet()
 ) : WebViewClient() {
 
     private val emptyResponse by lazy {
@@ -46,6 +47,8 @@ class UberWebViewClient(
 
     override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
         val url = request?.url?.toString() ?: return false
+        // Keep test-only file:// URLs inside the WebView.
+        if (internalUrls.contains(url)) return false
         return if (EinkInjector.isInternal(url)) {
             false
         } else {

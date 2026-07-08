@@ -94,6 +94,7 @@ object EinkInjector {
             /* Force all backgrounds to white — covers Uber's dark-mode classes,
                styled-components, and CSS-in-JS inline styles. */
             html, body, div, section, article, header, footer, nav, main, aside,
+            html body, html body div, html body section, html body article,
             [class*='dark'], [class*='theme-dark'], [class*='night'], [data-theme='dark'],
             [class*='background'], [class*='bg-'], [class*='container'], [class*='wrapper'],
             [class*='card'], [class*='panel'], [class*='sheet'], [class*='modal'],
@@ -144,25 +145,33 @@ object EinkInjector {
      * MutationObserver to re-inject it when Uber's SPA dynamically adds
      * content. Uber is a JS-heavy single-page app that renders most of its
      * DOM after onPageFinished, so a one-shot CSS injection is not enough.
+     *
+     * The style element is moved to the end of <head> on every injection so
+     * it wins any source-order ties against Uber's own !important rules.
+     */
+    /**
+     * JS injection variant that also forces a synchronous re-layout of the
+     * style element. Called from onPageStarted so the stylesheet is present
+     * before Uber's JS runs, even when the DOM is initially empty.
      */
     fun css(fontBoostPercent: Int = 15): String {
         require(fontBoostPercent in 0..100) { "fontBoostPercent out of range: $fontBoostPercent" }
         val css = cssText(fontBoostPercent).replace("\\", "\\\\").replace("'", "\\'").replace("\n", "\\n")
         return """
             (function(){
-              if (window.__inkberInjected) return;
-              window.__inkberInjected = true;
               var cssStr = '$css';
               function injectStyle() {
-                if (document.getElementById('inkber-eink')) {
-                  var existing = document.getElementById('inkber-eink');
-                  existing.textContent = cssStr;
-                  return;
+                var s = document.getElementById('inkber-eink');
+                if (!s) {
+                  s = document.createElement('style');
+                  s.id = 'inkber-eink';
                 }
-                var s = document.createElement('style');
-                s.id = 'inkber-eink';
                 s.textContent = cssStr;
-                (document.head || document.documentElement).appendChild(s);
+                var target = document.head || document.documentElement;
+                // Move to the end so our !important declarations win ties.
+                if (target.lastChild !== s) {
+                  target.appendChild(s);
+                }
               }
               function forceLightTheme() {
                 document.documentElement.setAttribute('data-theme', 'light');

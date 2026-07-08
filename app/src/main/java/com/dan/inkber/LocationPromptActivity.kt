@@ -1,10 +1,9 @@
 package com.dan.inkber
 
 import android.Manifest
-import android.app.Activity
+import android.content.Context
 import android.content.Intent
 import android.os.Bundle
-import android.view.View
 import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.TextView
@@ -104,5 +103,12 @@ class LocationPromptActivity : AppCompatActivity() {
         setContentView(root)
         @Suppress("DEPRECATION")
         overridePendingTransition(0, 0)
+    }
+
+    companion object {
+        /** Test-only intent. Production users always see the opt-in prompt. */
+        fun intentForTesting(context: Context): Intent {
+            return Intent(context, LocationPromptActivity::class.java)
+        }
     }
 }

@@ -27,7 +27,21 @@ jobs:
             ./gradlew assembleDebug testDebug --no-daemon --stacktrace
           '
 
-      - name: Upload debug APK
+      - name: Render and verify e-ink fixture screenshots
+        env:
+          NIXPKGS_ACCEPT_ANDROID_SDK_LICENSE: "1"
+        run: |
+          nix develop --impure --command bash -c '
+            ./gradlew testDebug --tests "com.dan.inkber.EinkCssDumpTest" --no-daemon &&
+            bash tools/fixture-screenshots.sh
+          '
+
+      - name: Upload fixture screenshots
+        uses: actions/upload-artifact@v4
+        with:
+          name: fixture-screenshots
+          path: docs/screenshots/raw/*.png
+          if-no-files-found: error
         uses: actions/upload-artifact@v4
         with:
           name: inkber-debug-apk

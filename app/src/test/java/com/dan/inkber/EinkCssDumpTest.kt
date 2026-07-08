@@ -34,6 +34,7 @@ class EinkCssDumpTest {
         File(dir, "eink.css").writeText(pureCss)
 
         // Build a representative mobile login page. Generic, not copied from Uber.
+        // eink.css is placed last in <head> to mirror the app's JS injection order.
         val ridesFixture = """
 <!doctype html>
 <html lang="en">
@@ -41,7 +42,6 @@ class EinkCssDumpTest {
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Uber</title>
-<link rel="stylesheet" href="eink.css">
 <style>
   * { box-sizing: border-box; }
   body { margin: 0; font-family: -apple-system, system-ui, sans-serif; background: #fafafa; color: #222; }
@@ -87,6 +87,7 @@ class EinkCssDumpTest {
              vertical-align: middle; margin-left: 8px; }
   @keyframes spin { to { transform: rotate(360deg); } }
 </style>
+<link rel="stylesheet" href="eink.css">
 </head>
 <body>
   <div class="app">
@@ -119,7 +120,7 @@ class EinkCssDumpTest {
         """.trimIndent()
         File(dir, "uber-login-fixture.html").writeText(ridesFixture)
 
-        // Eats variant.
+        // Eats variant — already light, just relabelled.
         val eatsFixture = ridesFixture
             .replace("<div class=\"logo\">Uber</div>", "<div class=\"logo\">Uber Eats</div>")
             .replace("Get a ride or order food", "Order food you love")
@@ -128,7 +129,203 @@ class EinkCssDumpTest {
             .replace("<div class=\"tab\">Eats</div>", "<div class=\"tab active\">Eats</div>")
         File(dir, "uber-eats-fixture.html").writeText(eatsFixture)
 
+        // Eats dark-mode fixture — exercises the reported Eats dark/scroll bug.
+        // Mimics Uber Eats React SPA: data-theme dark, CSS-in-JS inline styles,
+        // compressed line-heights, and a dark background class applied by JS.
+        // The eink.css link is deliberately placed LAST in <head> because the
+        // app injects it at the end of <head> via JS, so it wins source-order ties.
+        val eatsDarkFixture = """
+<!doctype html>
+<html lang="en" data-theme="dark" color-scheme="dark" style="color-scheme: dark;">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Uber Eats</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; font-family: -apple-system, system-ui, sans-serif;
+    background: #0d0d0d; color: #f5f5f5;
+    line-height: 1.1; /* squished text */
+  }
+  .theme-dark { background: #121212 !important; color: #fff !important; }
+  .app { display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+  .content {
+    flex: 1 1 auto; overflow-y: auto; -webkit-overflow-scrolling: touch;
+    background: #121212; color: #fff;
+  }
+  .header { padding: 28px 20px 8px; }
+  .logo { font-size: 28px; font-weight: 700; color: #fff; }
+  .hero { padding: 16px 20px; }
+  .hero h1 { font-size: 22px; margin: 0 0 12px; color: #fff; line-height: 1.1; }
+  .hero p { font-size: 15px; color: #aaa; line-height: 1.1; margin: 0 0 24px; }
+  .search-dark {
+    margin: 0 20px 16px; padding: 14px 12px; border-radius: 8px;
+    background: #1e1e1e; color: #fff; border: 1px solid #333;
+    font-size: 16px;
+  }
+  .category-dark {
+    padding: 12px 20px; background: #181818; color: #fff;
+    font-weight: 600; border-bottom: 1px solid #333;
+  }
+  .restaurant-card-dark {
+    margin: 0 20px 16px; padding: 16px; border-radius: 12px;
+    background: #1e1e1e; color: #fff; line-height: 1.1;
+  }
+  .restaurant-card-dark h2 { margin: 0 0 6px; font-size: 17px; color: #fff; }
+  .restaurant-card-dark p { margin: 0; font-size: 13px; color: #bbb; line-height: 1.1; }
+  .cta-dark {
+    width: 100%; padding: 16px; font-size: 16px; font-weight: 600;
+    background: #276ef1; color: #fff; border: none;
+  }
+  /* Bottom toggle bar */
+  .toggle-bar {
+    flex: 0 0 auto; display: flex; background: #121212;
+    border-top: 1px solid #333; padding: 10px 4px;
+  }
+  .toggle-bar .tab {
+    flex: 1 1 0; text-align: center; padding: 12px 4px;
+    font-size: 14px; color: #999; font-family: inherit;
+  }
+  .toggle-bar .tab.active { color: #fff; font-weight: 600; }
+</style>
+<link rel="stylesheet" href="eink.css">
+</head>
+<body class="theme-dark" style="background: #121212; color: #ffffff;">
+  <div class="app theme-dark">
+    <div class="content theme-dark">
+      <div class="header"><div class="logo">Uber Eats</div></div>
+      <div class="hero">
+        <h1 style="line-height: 1.1;">Order food you love</h1>
+        <p style="line-height: 1.1;">Discover local restaurants and fast delivery.</p>
+      </div>
+      <div class="search-dark">Search restaurants or cuisines</div>
+      <div class="category-dark">Popular near you</div>
+      <div class="restaurant-card-dark" style="background: #1e1e1e;">
+        <h2>Joe's Pizza</h2>
+        <p style="line-height: 1.1;">20–35 min · $2.49 Delivery Fee · 4.7 (1,200)</p>
+      </div>
+      <div class="restaurant-card-dark" style="background: #1e1e1e;">
+        <h2>Sakura Sushi</h2>
+        <p style="line-height: 1.1;">15–25 min · $1.99 Delivery Fee · 4.8 (850)</p>
+      </div>
+      <div class="restaurant-card-dark" style="background: #1e1e1e;">
+        <h2>Burger Joint</h2>
+        <p style="line-height: 1.1;">25–40 min · $3.49 Delivery Fee · 4.5 (2,100)</p>
+      </div>
+      <div class="restaurant-card-dark" style="background: #1e1e1e;">
+        <h2>Green Bowl</h2>
+        <p style="line-height: 1.1;">10–20 min · $0.99 Delivery Fee · 4.9 (600)</p>
+      </div>
+      <div class="restaurant-card-dark" style="background: #1e1e1e;">
+        <h2>Taco Place</h2>
+        <p style="line-height: 1.1;">15–30 min · $2.99 Delivery Fee · 4.6 (1,500)</p>
+      </div>
+      <button class="cta-dark">Find more food</button>
+      <div style="height: 40px;"></div>
+    </div>
+    <div class="toggle-bar">
+      <div class="tab">Rides</div>
+      <div class="tab active">Eats</div>
+      <div class="tab">Settings</div>
+    </div>
+  </div>
+</body>
+</html>
+        """.trimIndent()
+        File(dir, "uber-eats-dark-fixture.html").writeText(eatsDarkFixture)
+
+        // Rides dark-mode / squished-text fixture — exercises reported bug 5.
+        // eink.css is placed last in <head> to mirror the app's JS injection order.
+        val ridesDarkFixture = """
+<!doctype html>
+<html lang="en" data-theme="dark" color-scheme="dark" style="color-scheme: dark;">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Uber</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; font-family: -apple-system, system-ui, sans-serif;
+    background: #000000; color: #ffffff; line-height: 1.05;
+  }
+  .app { display: flex; flex-direction: column; height: 100vh; }
+  .content { flex: 1 1 auto; overflow-y: auto; }
+  .header { padding: 28px 20px 8px; }
+  .logo { font-size: 28px; font-weight: 700; color: #fff; }
+  .hero { padding: 16px 20px; }
+  .hero h1 { font-size: 22px; margin: 0 0 12px; color: #fff; line-height: 1.05; }
+  .hero p { font-size: 15px; color: #bbb; line-height: 1.05; margin: 0 0 24px; }
+  .location-row {
+    display: flex; align-items: center; gap: 12px;
+    margin: 0 20px 16px; padding: 16px; border-radius: 12px;
+    background: #1a1a1a; color: #fff;
+  }
+  .location-row p { margin: 0; font-size: 14px; line-height: 1.05; color: #fff; }
+  .vehicle-option {
+    margin: 0 20px 12px; padding: 16px; border-radius: 12px;
+    background: #1a1a1a; color: #fff; line-height: 1.05;
+  }
+  .vehicle-option h3 { margin: 0 0 4px; font-size: 16px; color: #fff; }
+  .vehicle-option p { margin: 0; font-size: 13px; color: #aaa; line-height: 1.05; }
+  .estimate {
+    margin: 0 20px 16px; padding: 14px 16px; border-radius: 8px;
+    background: #262626; color: #fff; font-size: 14px; line-height: 1.05;
+  }
+  /* Bottom toggle bar */
+  .toggle-bar {
+    flex: 0 0 auto; display: flex; background: #121212;
+    border-top: 1px solid #333; padding: 10px 4px;
+  }
+  .toggle-bar .tab {
+    flex: 1 1 0; text-align: center; padding: 12px 4px;
+    font-size: 14px; color: #999; font-family: inherit;
+  }
+  .toggle-bar .tab.active { color: #fff; font-weight: 600; }
+</style>
+<link rel="stylesheet" href="eink.css">
+</head>
+<body class="theme-dark" style="background: #000000; color: #ffffff;">
+  <div class="app">
+    <div class="content">
+      <div class="header"><div class="logo">Uber</div></div>
+      <div class="hero">
+        <h1 style="line-height: 1.05;">Where to?</h1>
+        <p style="line-height: 1.05;">Enter a destination to get a ride in minutes.</p>
+      </div>
+      <div class="location-row">
+        <p style="line-height: 1.05;">Use current location</p>
+      </div>
+      <div class="vehicle-option">
+        <h3 style="line-height: 1.05;">UberX</h3>
+        <p style="line-height: 1.05;">Affordable, everyday rides · 3 min away</p>
+      </div>
+      <div class="vehicle-option">
+        <h3 style="line-height: 1.05;">Comfort</h3>
+        <p style="line-height: 1.05;">Newer cars with extra legroom · 5 min away</p>
+      </div>
+      <div class="estimate">
+        Estimated trip: $12.34 · 15 min
+      </div>
+      <div class="vehicle-option">
+        <h3 style="line-height: 1.05;">Black</h3>
+        <p style="line-height: 1.05;">Premium rides with professional drivers · 8 min away</p>
+      </div>
+    </div>
+    <div class="toggle-bar">
+      <div class="tab active">Rides</div>
+      <div class="tab">Eats</div>
+      <div class="tab">Settings</div>
+    </div>
+  </div>
+</body>
+</html>
+        """.trimIndent()
+        File(dir, "uber-rides-dark-fixture.html").writeText(ridesDarkFixture)
+
         // Settings fixture mirrors preferences.xml structure.
+        // eink.css is placed last in <head> to mirror the app's JS injection order.
         val settingsHtml = """
 <!doctype html>
 <html lang="en">
@@ -136,7 +333,6 @@ class EinkCssDumpTest {
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Inkber Settings</title>
-<link rel="stylesheet" href="eink.css">
 <style>
   * { box-sizing: border-box; }
   body { margin: 0; font-family: -apple-system, system-ui, sans-serif; background: #fff; color: #111; }
@@ -172,6 +368,7 @@ class EinkCssDumpTest {
   }
   .info .summary { font-size: 13px; }
 </style>
+<link rel="stylesheet" href="eink.css">
 </head>
 <body>
   <div class="settings">

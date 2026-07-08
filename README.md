@@ -157,16 +157,29 @@ and `UberWebChromeClientTest.kt`.
   location-hook script, location-prompt state machine, prefs persistence.
 - **Robolectric tests (JVM, Android-shadowed):** `Prefs` SharedPreferences
   state machine, `UberWebChromeClient` geolocation gating.
-- **CI:** `.github/workflows/ci.yml` runs `./gradlew assembleDebug testDebug`
-  via the Nix flake on every push and PR.
+- **Fixture screenshot tests:** `tools/fixture-screenshots.sh` renders the
+  generated HTML fixtures with headless Chromium and asserts they stay light
+  (e-ink friendly) even when the fixtures mimic Uber's dark-mode SPA DOM.
+- **Emulator smoke test:** `tools/emulator-test.sh` boots a headless emulator,
+  installs the debug APK, loads the same local fixtures, and captures
+  screenshots of native UI + WebView. Requires KVM.
+- **CI:** `.github/workflows/ci.yml` runs the unit tests and fixture screenshot
+  assertions via the Nix flake on every push and PR.
 
 Run locally:
 
 ```sh
+# Unit tests
 ./gradlew testDebug
+
+# Fixture screenshots (generates docs/screenshots/raw/*.png)
+bash tools/fixture-screenshots.sh
+
+# Emulator smoke test (requires KVM, ~2-3 minutes)
+bash tools/emulator-test.sh
 ```
 
-23 tests, 0 failures at time of writing.
+36 tests, 0 failures at time of writing.
 
 ## Project layout
 

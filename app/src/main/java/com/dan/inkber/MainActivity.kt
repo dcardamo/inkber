@@ -31,6 +31,13 @@ class MainActivity : AppCompatActivity() {
         EATS("https://www.ubereats.com")
     }
 
+    /** Test-only URL overrides, supplied via intent extras. */
+    private fun effectiveRidesUrl(): String =
+        intent.getStringExtra(EXTRA_TEST_URL_RIDES) ?: Tab.RIDES.url
+
+    private fun effectiveEatsUrl(): String =
+        intent.getStringExtra(EXTRA_TEST_URL_EATS) ?: Tab.EATS.url
+
     private val locationPromptResult =
         registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
             Log.d(TAG, "LocationPrompt result: ${result.resultCode}")
@@ -57,6 +64,10 @@ class MainActivity : AppCompatActivity() {
         val container = findViewById<android.widget.FrameLayout>(R.id.webview_container)
         ridesWebView = UberWebView(this).apply { tag = "rides" }
         eatsWebView = UberWebView(this).apply { tag = "eats" }
+        if (intent.hasExtra(EXTRA_TEST_URL_RIDES) || intent.hasExtra(EXTRA_TEST_URL_EATS)) {
+            ridesWebView.setTestMode()
+            eatsWebView.setTestMode()
+        }
         container.addView(ridesWebView)
         container.addView(eatsWebView)
         eatsWebView.visibility = View.GONE
@@ -68,8 +79,8 @@ class MainActivity : AppCompatActivity() {
         eatsWebView.restoreState(savedInstanceState?.getBundle(KEY_EATS_STATE) ?: Bundle())
 
         if (savedInstanceState == null) {
-            ridesWebView.loadUrl(Tab.RIDES.url)
-            eatsWebView.loadUrl(Tab.EATS.url)
+            ridesWebView.loadUrl(effectiveRidesUrl())
+            eatsWebView.loadUrl(effectiveEatsUrl())
         }
 
         tabRides.setOnClickListener { switchTab(Tab.RIDES) }
@@ -88,7 +99,14 @@ class MainActivity : AppCompatActivity() {
         configureWebView(eatsWebView)
         applyKeepScreenOn(inTrip && prefs.screenOnDuringTrip)
 
-        if (prefs.shouldShowLocationPrompt()) {
+        // Test harness can skip the location prompt via an intent extra so
+        // emulator screenshots don't get stuck on a permission activity.
+        if (intent.getBooleanExtra(EXTRA_SKIP_LOCATION_PROMPT, false)) {
+            Log.d(TAG, "onResume: skipping location prompt (test mode)")
+            if (locationProvider.hasPermission()) {
+                injectLocationIntoActiveWebView()
+            }
+        } else if (prefs.shouldShowLocationPrompt()) {
             showLocationOptInDialog()
         } else if (locationProvider.hasPermission()) {
             injectLocationIntoActiveWebView()
@@ -120,12 +138,17 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun configureWebView(wv: UberWebView) {
+        val testUrls = setOfNotNull(
+            intent.getStringExtra(EXTRA_TEST_URL_RIDES),
+            intent.getStringExtra(EXTRA_TEST_URL_EATS)
+        )
         val client = UberWebViewClient(
             einkEnabled = { prefs.einkEnabled },
             fontBoostPercent = { prefs.fontBoostPercent },
             onExternalUrl = { url -> openExternal(url) },
             onTripStateChange = { trip -> onTripStateChange(trip) },
-            onLocationReady = { injectLocationIntoWebView(wv) }
+            onLocationReady = { injectLocationIntoWebView(wv) },
+            internalUrls = testUrls
         )
         val chrome = UberWebChromeClient(this)
         wv.webViewClient = client
@@ -199,6 +222,9 @@ class MainActivity : AppCompatActivity() {
     }
 
     companion object {
+        internal const val EXTRA_SKIP_LOCATION_PROMPT = "inkber.SKIP_LOCATION_PROMPT"
+        internal const val EXTRA_TEST_URL_RIDES = "inkber.TEST_URL_RIDES"
+        internal const val EXTRA_TEST_URL_EATS = "inkber.TEST_URL_EATS"
         private const val TAG = "Inkber"
         private const val KEY_RIDES_STATE = "rides_state"
         private const val KEY_EATS_STATE = "eats_state"

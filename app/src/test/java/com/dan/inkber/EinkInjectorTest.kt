@@ -19,7 +19,6 @@ class EinkInjectorTest {
             "animation: none",
             "transition: none",
             "line-height: 1.5",
-            "__inkberInjected",
             "MutationObserver"
         ).forEach {
             assertTrue("CSS missing: $it", css.contains(it))
@@ -138,10 +137,12 @@ class EinkInjectorTest {
         } catch (e: IllegalArgumentException) {}
     }
 
-    @Test fun cssIsIdempotentGuard() {
+    @Test fun cssStyleElementMovedToEndOfHead() {
         val css = EinkInjector.css()
-        val guardCount = Regex("window\\.__inkberInjected").findAll(css).count()
-        assertTrue("Expected idempotency guard", guardCount >= 2)
+        assertTrue("should append style to head/documentElement",
+            css.contains("target.appendChild(s)"))
+        assertTrue("should avoid redundant append",
+            css.contains("target.lastChild !== s"))
     }
 
     @Test fun cssTextIsPureCss() {
@@ -168,10 +169,9 @@ class EinkInjectorTest {
 
     @Test fun cssResetsInjectionGuardOnNewPageLoad() {
         // The WebViewClient resets the guard on onPageStarted so CSS
-        // re-injects after navigation. Verify the css() function itself
-        // has the guard (idempotent within a page), and the reset logic
-        // is in the client (tested separately).
+        // re-injects after navigation. The css() function no longer carries
+        // the guard; idempotency is handled by the single style element id.
         val css = EinkInjector.css()
-        assertTrue("must check existing injection", css.contains("if (window.__inkberInjected)"))
+        assertTrue("must use a single style element id", css.contains("inkber-eink"))
     }
 }

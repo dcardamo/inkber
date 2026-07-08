@@ -17,7 +17,10 @@ result-*
 
 # Screenshot intermediates (final PNGs in docs/screenshots/ are committed)
 docs/screenshots/raw/
+docs/screenshots/emulator/
 docs/screenshots/uber-login-fixture.html
 docs/screenshots/uber-eats-fixture.html
+docs/screenshots/uber-eats-dark-fixture.html
+docs/screenshots/uber-rides-dark-fixture.html
 docs/screenshots/settings-fixture.html
 docs/screenshots/eink.css

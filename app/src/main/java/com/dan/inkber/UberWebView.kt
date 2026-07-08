@@ -30,6 +30,11 @@ class UberWebView @JvmOverloads constructor(
         configure()
     }
 
+    /** Test-only: enable file access for local fixture URLs. */
+    fun setTestMode() {
+        settings.allowFileAccess = true
+    }
+
     private fun configure() {
         // Software rendering avoids e-ink panel artefacts from hardware layers,
         // but on the Android emulator (swiftshader) it prevents the WebView from
