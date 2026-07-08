@@ -141,18 +141,12 @@ object EinkInjector {
     }
 
     /**
-     * The full JS injection script. Injects the CSS AND sets up a
-     * MutationObserver to re-inject it when Uber's SPA dynamically adds
-     * content. Uber is a JS-heavy single-page app that renders most of its
-     * DOM after onPageFinished, so a one-shot CSS injection is not enough.
-     *
-     * The style element is moved to the end of <head> on every injection so
-     * it wins any source-order ties against Uber's own !important rules.
-     */
-    /**
-     * JS injection variant that also forces a synchronous re-layout of the
-     * style element. Called from onPageStarted so the stylesheet is present
-     * before Uber's JS runs, even when the DOM is initially empty.
+     * The full JS injection script. Injects the CSS and keeps the style element
+     * at the end of <head> so it wins source-order ties. A MutationObserver
+     * watches only for newly injected <style>/<link> nodes and re-appends our
+     * style when Uber's SPA adds its own stylesheets. Light-theme attributes are
+     * enforced via a short polling interval, not from the observer, to avoid the
+     * recursive mutation loops that were hanging Uber's loader.
      */
     fun css(fontBoostPercent: Int = 15): String {
         require(fontBoostPercent in 0..100) { "fontBoostPercent out of range: $fontBoostPercent" }
@@ -168,38 +162,72 @@ object EinkInjector {
                 }
                 s.textContent = cssStr;
                 var target = document.head || document.documentElement;
-                // Move to the end so our !important declarations win ties.
-                if (target.lastChild !== s) {
+                if (target && target.lastChild !== s) {
                   target.appendChild(s);
                 }
               }
               function forceLightTheme() {
-                document.documentElement.setAttribute('data-theme', 'light');
-                document.documentElement.setAttribute('color-scheme', 'light');
-                document.documentElement.style.colorScheme = 'light';
+                if (!document.documentElement) return;
+                if (document.documentElement.getAttribute('data-theme') !== 'light') {
+                  document.documentElement.setAttribute('data-theme', 'light');
+                }
+                if (document.documentElement.getAttribute('color-scheme') !== 'light') {
+                  document.documentElement.setAttribute('color-scheme', 'light');
+                }
+                if (document.documentElement.style.colorScheme !== 'light') {
+                  document.documentElement.style.colorScheme = 'light';
+                }
                 if (document.body) {
-                  document.body.setAttribute('data-theme', 'light');
-                  document.body.style.background = '#ffffff';
-                  document.body.style.color = '#111111';
-                  document.body.style.colorScheme = 'light';
+                  if (document.body.getAttribute('data-theme') !== 'light') {
+                    document.body.setAttribute('data-theme', 'light');
+                  }
+                  if (document.body.style.background !== '#ffffff') {
+                    document.body.style.background = '#ffffff';
+                  }
+                  if (document.body.style.color !== '#111111') {
+                    document.body.style.color = '#111111';
+                  }
+                  if (document.body.style.colorScheme !== 'light') {
+                    document.body.style.colorScheme = 'light';
+                  }
                 }
               }
               injectStyle();
               forceLightTheme();
-              if (window.__inkberObserver) return;
-              var observer = new MutationObserver(function(mutations) {
-                injectStyle();
-                forceLightTheme();
-              });
-              if (document.documentElement) {
-                observer.observe(document.documentElement, {
-                  childList: true,
-                  subtree: true,
-                  attributes: true,
-                  attributeFilter: ['style', 'class', 'data-theme']
+
+              if (!window.__inkberObserver) {
+                var observer = new MutationObserver(function(mutations) {
+                  var needsReinject = false;
+                  for (var i = 0; i < mutations.length; i++) {
+                    var m = mutations[i];
+                    if (m.type !== 'childList') continue;
+                    for (var j = 0; j < m.addedNodes.length; j++) {
+                      var n = m.addedNodes[j];
+                      if (n.tagName === 'STYLE' || n.tagName === 'LINK') {
+                        needsReinject = true;
+                      }
+                    }
+                  }
+                  if (needsReinject) injectStyle();
                 });
+                if (document.documentElement) {
+                  observer.observe(document.documentElement, {
+                    childList: true,
+                    subtree: true
+                  });
+                }
+                window.__inkberObserver = observer;
               }
-              window.__inkberObserver = observer;
+
+              // Poll light-theme attributes for ~5s after injection. Uber's JS
+              // may set dark theme after the initial load; polling avoids the
+              // recursive MutationObserver loop that caused the loader to hang.
+              var pollCount = 0;
+              var pollId = setInterval(function() {
+                forceLightTheme();
+                pollCount++;
+                if (pollCount >= 20) clearInterval(pollId);
+              }, 250);
             })();
         """.trimIndent()
     }

@@ -20,18 +20,23 @@ import java.io.File
 class EinkCssDumpTest {
 
     @Test fun dumpsCssAndFixture() {
-        val dir = run {
-            var f = File(System.getProperty("user.dir"))
+        val root = run {
+            var f = File(System.getProperty("user.dir") ?: ".")
             while (f.parentFile != null && !File(f, "flake.nix").exists()) {
-                f = f.parentFile
+                f = f.parentFile!!
             }
-            File(f, "docs/screenshots")
+            f
         }
-        dir.mkdirs()
+        val dir = File(root, "docs/screenshots").apply { mkdirs() }
 
         // Use cssText() directly — it's pure CSS without the JS wrapper.
         val pureCss = EinkInjector.cssText(15)
         File(dir, "eink.css").writeText(pureCss)
+
+        // Mirror the same CSS and SPA fixture into androidTest assets so the
+        // instrumented WebView tests can load them without a network server.
+        val assetsDir = File(root, "app/src/androidTest/assets/fixtures").apply { mkdirs() }
+        File(assetsDir, "eink.css").writeText(pureCss)
 
         // Build a representative mobile login page. Generic, not copied from Uber.
         // eink.css is placed last in <head> to mirror the app's JS injection order.
@@ -429,5 +434,71 @@ class EinkCssDumpTest {
 </html>
         """.trimIndent()
         File(dir, "settings-fixture.html").writeText(settingsHtml)
+
+        // Dynamic SPA fixture — mimics Uber's React app: shows a loader, then
+        // renders content via JS after a delay. This is used by instrumented
+        // tests to verify our CSS/JS injection does not hang the page.
+        val dynamicSpa = """
+<!doctype html>
+<html lang="en" data-theme="dark" color-scheme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Uber SPA</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; font-family: -apple-system, system-ui, sans-serif;
+    background: #000000; color: #ffffff; line-height: 1.1;
+  }
+  .app { display: flex; flex-direction: column; height: 100vh; }
+  .content { flex: 1 1 auto; overflow-y: auto; padding: 20px; }
+  .spinner {
+    width: 40px; height: 40px; margin: 40px auto;
+    border: 4px solid #333; border-top-color: #fff; border-radius: 50%;
+    animation: spin 1s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .loaded h1 { font-size: 24px; margin: 0 0 16px; color: #fff; line-height: 1.1; }
+  .loaded p { font-size: 15px; color: #aaa; line-height: 1.1; }
+  .card {
+    margin: 16px 0; padding: 16px; border-radius: 12px;
+    background: #1a1a1a; color: #fff;
+  }
+</style>
+<link rel="stylesheet" href="eink.css">
+</head>
+<body class="theme-dark">
+  <div class="app">
+    <div class="content" id="root">
+      <div class="spinner" id="loader"></div>
+    </div>
+  </div>
+  <script>
+    // Mimic Uber's SPA: render content after a short delay.
+    setTimeout(function() {
+      var root = document.getElementById('root');
+      root.innerHTML =
+        '<div class="loaded">' +
+        '<h1>Where to?</h1>' +
+        '<p>Enter a destination to get a ride in minutes.</p>' +
+        '<div class="card">UberX · 3 min away</div>' +
+        '<div class="card">Comfort · 5 min away</div>' +
+        '</div>';
+      window.dispatchEvent(new CustomEvent('spa:loaded'));
+      try {
+        if (typeof InkberTest !== 'undefined') {
+          InkberTest.onSpaLoaded();
+        }
+      } catch(e) {}
+    }, 800);
+  </script>
+</body>
+</html>
+        """.trimIndent()
+        File(dir, "uber-spa-fixture.html").writeText(dynamicSpa)
+
+        // Copy dynamic SPA fixture and CSS into androidTest assets.
+        File(assetsDir, "uber-spa-fixture.html").writeText(dynamicSpa)
     }
 }

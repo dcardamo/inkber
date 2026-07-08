@@ -137,12 +137,20 @@ class EinkInjectorTest {
         } catch (e: IllegalArgumentException) {}
     }
 
-    @Test fun cssStyleElementMovedToEndOfHead() {
+    @Test fun cssObserverWatchesStyleAndLinkNodesOnly() {
         val css = EinkInjector.css()
-        assertTrue("should append style to head/documentElement",
-            css.contains("target.appendChild(s)"))
-        assertTrue("should avoid redundant append",
-            css.contains("target.lastChild !== s"))
+        assertTrue("must watch childList", css.contains("childList: true"))
+        assertTrue("must watch subtree", css.contains("subtree: true"))
+        assertTrue("must detect added STYLE/LINK nodes",
+            css.contains("n.tagName === 'STYLE' || n.tagName === 'LINK'"))
+        assertFalse("must NOT watch attributes (would recurse on forceLightTheme)",
+            css.contains("attributes: true"))
+    }
+
+    @Test fun cssPollsLightTheme() {
+        val css = EinkInjector.css()
+        assertTrue("should poll forceLightTheme", css.contains("setInterval"))
+        assertTrue("should clear interval after ~5s", css.contains("pollCount >= 20"))
     }
 
     @Test fun cssTextIsPureCss() {

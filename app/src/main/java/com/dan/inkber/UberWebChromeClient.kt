@@ -1,22 +1,31 @@
 package com.dan.inkber
 
 import android.content.Context
+import android.util.Log
+import android.webkit.ConsoleMessage
 import android.webkit.GeolocationPermissions
 import android.webkit.PermissionRequest
 import android.webkit.WebChromeClient
 
 /**
- * Gates browser-permission requests coming from Uber's web pages.
- *
- * Geolocation: granted for Uber origins if and only if the app holds the
- * ACCESS_FINE_LOCATION system permission. There is no separate "share location
- * with Uber" toggle — the system permission IS the toggle. If the user granted
- * it, we share; if they denied it, we don't. This is simpler and matches user
- * expectations: allowing location access to the app means Uber gets it.
+ * Gates browser-permission requests coming from Uber's web pages and forwards
+ * JavaScript console messages to logcat for debugging injection issues.
  */
 class UberWebChromeClient(
     private val context: Context
 ) : WebChromeClient() {
+
+    override fun onConsoleMessage(consoleMessage: ConsoleMessage?): Boolean {
+        val msg = consoleMessage?.message() ?: ""
+        val line = consoleMessage?.lineNumber() ?: 0
+        val source = consoleMessage?.sourceId() ?: ""
+        when (consoleMessage?.messageLevel()) {
+            ConsoleMessage.MessageLevel.ERROR -> Log.e(TAG, "JS [$source:$line] $msg")
+            ConsoleMessage.MessageLevel.WARNING -> Log.w(TAG, "JS [$source:$line] $msg")
+            else -> Log.d(TAG, "JS [$source:$line] $msg")
+        }
+        return true
+    }
 
     override fun onGeolocationPermissionsShowPrompt(
         origin: String,
@@ -38,5 +47,9 @@ class UberWebChromeClient(
     /** Helper for tests: decide whether a geo request would be granted. */
     fun wouldGrantGeolocation(origin: String, systemPermissionGranted: Boolean): Boolean {
         return systemPermissionGranted && EinkInjector.isInternal(origin)
+    }
+
+    companion object {
+        private const val TAG = "InkberChrome"
     }
 }
