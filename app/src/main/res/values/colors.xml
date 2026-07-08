@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="white">#FFFFFFFF</color>
+    <color name="black">#FF000000</color>
+    <color name="ink_text">#FF111111</color>
+    <color name="ink_bg">#FFFFFFFF</color>
+    <color name="ink_border">#FF888888</color>
+    <color name="ink_tab_active">#FF111111</color>
+    <color name="ink_tab_inactive">#FF666666</color>
+</resources>

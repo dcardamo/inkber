@@ -1,0 +1,48 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v27
+        with:
+          nix_path: nixpkgs=channel:nixos-unstable
+
+      - name: Derive version from tag
+        id: ver
+        run: echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Build release APK (unsigned)
+        env:
+          NIXPKGS_ACCEPT_ANDROID_SDK_LICENSE: "1"
+        run: |
+          nix develop --impure --command bash -c '
+            ./gradlew assembleRelease --no-daemon --stacktrace
+          '
+
+      - name: Rename APK to inkber-vX.Y.Z.apk
+        run: |
+          mkdir -p release
+          cp app/build/outputs/apk/release/*.apk "release/inkber-v${{ steps.ver.outputs.VERSION }}.apk"
+          sha256sum "release/inkber-v${{ steps.ver.outputs.VERSION }}.apk" > "release/inkber-v${{ steps.ver.outputs.VERSION }}.apk.sha256"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            release/inkber-v${{ steps.ver.outputs.VERSION }}.apk
+            release/inkber-v${{ steps.ver.outputs.VERSION }}.apk.sha256
+          generate_release_notes: true
+          draft: false
+          prerelease: ${{ contains(github.ref_name, '-') }}

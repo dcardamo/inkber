@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Inkber</string>
+    <string name="settings_title">Settings</string>
+    <string name="tab_rides">Rides</string>
+    <string name="tab_eats">Eats</string>
+    <string name="tab_settings">Settings</string>
+    <string name="settings_screen_on_during_trip">Keep screen on during trip</string>
+    <string name="settings_screen_on_summary">Prevents the screen sleeping while a ride is in progress</string>
+    <string name="settings_location">Share location with Uber</string>
+    <string name="settings_location_summary">Off by default. When on, precise GPS is shared only with m.uber.com and eats.uber.com to auto-fill your pickup point.</string>
+    <string name="settings_eink_mode">E-ink rendering optimisations</string>
+    <string name="settings_eink_summary">Force light theme, disable animations, boost contrast and font size</string>
+    <string name="settings_font_boost">Font size boost</string>
+    <string name="settings_about">About Inkber</string>
+    <string name="settings_version">Version</string>
+    <string name="settings_license">MIT License, Copyright (c) 2026 Dan Cardamore</string>
+    <string name="settings_source">Source: github.com/dcardamo/inkber</string>
+
+    <!-- Location opt-in dialog -->
+    <string name="location_dialog_title">Share your location?</string>
+    <string name="location_dialog_message">Uber works best with your precise location: it auto-fills your pickup point, gives accurate ETAs, and matches you to nearby drivers faster.\n\nInkber shares location only with m.uber.com and eats.uber.com, never with anyone else. You can turn this off anytime in Settings.</string>
+    <string name="location_dialog_allow">Allow</string>
+    <string name="location_dialog_not_now">Not now</string>
+    <string name="location_dialog_never">Don\'t ask again</string>
+
+    <!-- Reload hint -->
+    <string name="reload">Reload</string>
+</resources>

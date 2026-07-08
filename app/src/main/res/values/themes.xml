@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <style name="Theme.Inkber" parent="Theme.MaterialComponents.Light.NoActionBar">
+        <item name="android:windowBackground">@color/ink_bg</item>
+        <item name="android:colorBackground">@color/ink_bg</item>
+        <item name="android:textColor">@color/ink_text</item>
+        <item name="android:textColorPrimary">@color/ink_text</item>
+        <item name="colorPrimary">@color/ink_text</item>
+        <item name="colorPrimaryDark">@color/ink_text</item>
+        <item name="colorAccent">@color/ink_text</item>
+        <item name="android:statusBarColor" tools:targetApi="21">@color/ink_bg</item>
+        <item name="android:navigationBarColor" tools:targetApi="21">@color/ink_bg</item>
+        <item name="android:windowLightStatusBar" tools:targetApi="23">true</item>
+        <!-- No animations on activity transitions; e-ink ghosting. -->
+        <item name="android:windowAnimationStyle">@null</item>
+    </style>
+</resources>
