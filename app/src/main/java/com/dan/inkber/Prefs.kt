@@ -7,15 +7,19 @@ import android.content.SharedPreferences
  * Typed accessor for the Inkber preferences.
  *
  * Keys are namespaced under "inkber_" to avoid collisions when backed up /
- * restored. Defaults are chosen so that the app is private-first: location is
- * off, e-ink optimisations are on (the whole point of the app), screen-on is
- * off (battery), and the location-prompt state is "not yet shown".
+ * restored. Defaults are chosen so that the app is private-first: e-ink
+ * optimisations are on (the whole point of the app), screen-on is off
+ * (battery), and the location-prompt state is "not yet shown".
+ *
+ * Note: there is no separate "share location with Uber" toggle. Location
+ * sharing is controlled solely by the Android ACCESS_FINE_LOCATION system
+ * permission. If the user grants it, Uber gets location; if they deny it,
+ * Uber doesn't. The first-run dialog asks for the system permission.
  */
 class Prefs private constructor(private val sp: SharedPreferences) {
 
     companion object {
         private const val FILE = "inkber_prefs"
-        private const val K_LOCATION = "inkber_location_enabled"
         private const val K_EINK = "inkber_eink_enabled"
         private const val K_FONT_BOOST = "inkber_font_boost_pct"
         private const val K_SCREEN_ON = "inkber_screen_on_during_trip"
@@ -28,10 +32,6 @@ class Prefs private constructor(private val sp: SharedPreferences) {
         fun of(context: Context): Prefs =
             Prefs(context.getSharedPreferences(FILE, Context.MODE_PRIVATE))
     }
-
-    var locationEnabled: Boolean
-        get() = sp.getBoolean(K_LOCATION, false)
-        set(v) { sp.edit().putBoolean(K_LOCATION, v).apply() }
 
     var einkEnabled: Boolean
         get() = sp.getBoolean(K_EINK, true)
@@ -52,5 +52,5 @@ class Prefs private constructor(private val sp: SharedPreferences) {
 
     /** True iff we should show the opt-in dialog now. */
     fun shouldShowLocationPrompt(): Boolean =
-        locationPromptState == PROMPT_NOT_SHOWN && !locationEnabled
+        locationPromptState == PROMPT_NOT_SHOWN
 }

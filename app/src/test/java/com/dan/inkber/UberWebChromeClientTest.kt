@@ -11,34 +11,31 @@ import org.robolectric.annotation.Config
 
 /**
  * Robolectric tests for the WebChromeClient geolocation gating logic.
+ *
+ * Bug 1 fix: there is no longer a separate "locationEnabled" app-level toggle.
+ * Geolocation is granted solely based on the system permission state.
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [31])
 class UberWebChromeClientTest {
 
-    @Test fun grantsGeoWhenEnabledAndInternalAndPermitted() {
+    @Test fun grantsGeoWhenSystemPermissionGrantedAndInternal() {
         val ctx = ApplicationProvider.getApplicationContext<Context>()
-        val client = UberWebChromeClient(ctx) { true } // location enabled
+        val client = UberWebChromeClient(ctx)
         assertTrue(client.wouldGrantGeolocation("https://m.uber.com/", true))
-        assertTrue(client.wouldGrantGeolocation("https://eats.uber.com/", true))
-    }
-
-    @Test fun deniesGeoWhenLocationDisabledAtAppLevel() {
-        val ctx = ApplicationProvider.getApplicationContext<Context>()
-        val client = UberWebChromeClient(ctx) { false } // location disabled
-        assertFalse(client.wouldGrantGeolocation("https://m.uber.com/", true))
-    }
-
-    @Test fun deniesGeoForExternalOrigins() {
-        val ctx = ApplicationProvider.getApplicationContext<Context>()
-        val client = UberWebChromeClient(ctx) { true }
-        assertFalse(client.wouldGrantGeolocation("https://evil.example.com/", true))
-        assertFalse(client.wouldGrantGeolocation("https://google.com/", true))
+        assertTrue(client.wouldGrantGeolocation("https://www.ubereats.com/", true))
     }
 
     @Test fun deniesGeoWhenSystemPermissionMissing() {
         val ctx = ApplicationProvider.getApplicationContext<Context>()
-        val client = UberWebChromeClient(ctx) { true }
+        val client = UberWebChromeClient(ctx)
         assertFalse(client.wouldGrantGeolocation("https://m.uber.com/", false))
+    }
+
+    @Test fun deniesGeoForExternalOrigins() {
+        val ctx = ApplicationProvider.getApplicationContext<Context>()
+        val client = UberWebChromeClient(ctx)
+        assertFalse(client.wouldGrantGeolocation("https://evil.example.com/", true))
+        assertFalse(client.wouldGrantGeolocation("https://google.com/", true))
     }
 }

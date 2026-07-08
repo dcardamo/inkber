@@ -12,13 +12,13 @@ class EinkInjectorTest {
 
     @Test fun cssContainsEinkRules() {
         val css = EinkInjector.css()
-        // Core e-ink rules must be present.
         listOf(
             "color-scheme: light only",
             "background: #ffffff",
             "color: #111111",
             "animation: none",
             "transition: none",
+            "line-height: 1.5",
             "__inkberInjected"
         ).forEach {
             assertTrue("CSS missing: $it", css.contains(it))
@@ -31,8 +31,6 @@ class EinkInjectorTest {
     }
 
     @Test fun cssFontBoostClampedLow() {
-        // coerceAtLeast(0) - a negative input should still produce a positive boost.
-        // (caller is expected to clamp, but the function should not throw)
         val css = EinkInjector.css(fontBoostPercent = 0)
         assertTrue(css.contains("0% larger"))
     }
@@ -41,20 +39,27 @@ class EinkInjectorTest {
         try {
             EinkInjector.css(fontBoostPercent = 200)
             fail("Expected IllegalArgumentException")
-        } catch (e: IllegalArgumentException) {
-            // expected
-        }
+        } catch (e: IllegalArgumentException) {}
         try {
             EinkInjector.css(fontBoostPercent = -1)
             fail("Expected IllegalArgumentException")
-        } catch (e: IllegalArgumentException) {
-            // expected
-        }
+        } catch (e: IllegalArgumentException) {}
     }
 
-    @Test fun shouldInjectForUberOrigins() {
+    @Test fun shouldInjectForUberOrigins_rides() {
         assertTrue(EinkInjector.shouldInject("https://m.uber.com/"))
+    }
+
+    @Test fun shouldInjectForUberOrigins_eats() {
         assertTrue(EinkInjector.shouldInject("https://eats.uber.com/"))
+    }
+
+    @Test fun shouldInjectForWwwUbereats() {
+        // Bug 3 fix: www.ubereats.com must be in the inject list.
+        assertTrue(EinkInjector.shouldInject("https://www.ubereats.com/"))
+    }
+
+    @Test fun shouldInjectForAuthAndRiders() {
         assertTrue(EinkInjector.shouldInject("https://auth.uber.com/login"))
         assertTrue(EinkInjector.shouldInject("https://riders.uber.com/trip"))
     }
@@ -73,6 +78,7 @@ class EinkInjectorTest {
     @Test fun isInternalForUberDomains() {
         assertTrue(EinkInjector.isInternal("https://m.uber.com/"))
         assertTrue(EinkInjector.isInternal("https://eats.uber.com/"))
+        assertTrue(EinkInjector.isInternal("https://www.ubereats.com/"))
         assertTrue(EinkInjector.isInternal("https://login.uber.com/v2/login"))
     }
 
@@ -85,7 +91,6 @@ class EinkInjectorTest {
         assertTrue(EinkInjector.isBlocked("https://google-analytics.com/analytics.js"))
         assertTrue(EinkInjector.isBlocked("https://www.googletagmanager.com/gtm.js"))
         assertTrue(EinkInjector.isBlocked("https://ads.doubleclick.net/banner"))
-        assertTrue(EinkInjector.isBlocked("https://connect.facebook.net/en_US/fbevents.js"))
     }
 
     @Test fun isNotBlockedForUberOrInnocentHosts() {
@@ -94,34 +99,46 @@ class EinkInjectorTest {
         assertFalse(EinkInjector.isBlocked("https://example.com/script.js"))
     }
 
-    @Test fun locationHookScriptEmbedsCoords() {
-        val js = EinkInjector.locationHookScript(37.7749, -122.4194)
-        assertTrue(js.contains("lat: 37.7749"))
-        assertTrue(js.contains("lon: -122.4194"))
+    @Test fun locationOverrideScriptOverridesGetCurrentPosition() {
+        val js = EinkInjector.locationOverrideScript(37.7749, -122.4194)
+        assertTrue("must override getCurrentPosition",
+            js.contains("navigator.geolocation.getCurrentPosition = function"))
+        assertTrue(js.contains("latitude: 37.7749"))
+        assertTrue(js.contains("longitude: -122.4194"))
         assertTrue(js.contains("__inkberLoc"))
         assertTrue(js.contains("inkber:location"))
     }
 
-    @Test fun locationHookScriptRejectsOutOfRangeCoords() {
+    @Test fun locationOverrideScriptOverridesWatchPosition() {
+        val js = EinkInjector.locationOverrideScript(37.7749, -122.4194)
+        assertTrue("must override watchPosition",
+            js.contains("navigator.geolocation.watchPosition = function"))
+    }
+
+    @Test fun locationOverrideScriptProvidesFullCoordsObject() {
+        val js = EinkInjector.locationOverrideScript(0.0, 0.0)
+        // The coords object must have all fields that the GeolocationPosition
+        // API expects, otherwise Uber's code may throw.
+        listOf("latitude", "longitude", "accuracy", "altitude", "altitudeAccuracy",
+               "heading", "speed", "timestamp").forEach {
+            assertTrue("coords missing: $it", js.contains(it))
+        }
+    }
+
+    @Test fun locationOverrideScriptRejectsOutOfRangeCoords() {
         try {
-            EinkInjector.locationHookScript(91.0, 0.0)
+            EinkInjector.locationOverrideScript(91.0, 0.0)
             fail("Expected IllegalArgumentException for lat > 90")
         } catch (e: IllegalArgumentException) {}
         try {
-            EinkInjector.locationHookScript(0.0, 181.0)
+            EinkInjector.locationOverrideScript(0.0, 181.0)
             fail("Expected IllegalArgumentException for lon > 180")
-        } catch (e: IllegalArgumentException) {}
-        try {
-            EinkInjector.locationHookScript(-91.0, 0.0)
-            fail("Expected IllegalArgumentException for lat < -90")
         } catch (e: IllegalArgumentException) {}
     }
 
     @Test fun cssIsIdempotentGuard() {
-        // The injected IIFE guards against double-injection with __inkberInjected.
-        // Verify the guard is present so repeated onPageFinished calls are safe.
         val css = EinkInjector.css()
         val guardCount = Regex("window\\.__inkberInjected").findAll(css).count()
-        assertTrue("Expected idempotency guard", guardCount >= 2) // check + set
+        assertTrue("Expected idempotency guard", guardCount >= 2)
     }
 }

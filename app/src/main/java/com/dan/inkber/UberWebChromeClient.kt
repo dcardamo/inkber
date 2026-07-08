@@ -1,7 +1,6 @@
 package com.dan.inkber
 
 import android.content.Context
-import android.location.Location
 import android.webkit.GeolocationPermissions
 import android.webkit.PermissionRequest
 import android.webkit.WebChromeClient
@@ -9,24 +8,22 @@ import android.webkit.WebChromeClient
 /**
  * Gates browser-permission requests coming from Uber's web pages.
  *
- * Geolocation: granted only for Uber origins, and only if the user has opted in
- * to sharing location at the app level (Settings + system permission). This is
- * the bridge between [LocationProvider]'s system permission and the web page's
- * geolocation API - the page asks via the standard browser geo prompt, and we
- * answer yes or no here rather than silently leaking.
+ * Geolocation: granted for Uber origins if and only if the app holds the
+ * ACCESS_FINE_LOCATION system permission. There is no separate "share location
+ * with Uber" toggle — the system permission IS the toggle. If the user granted
+ * it, we share; if they denied it, we don't. This is simpler and matches user
+ * expectations: allowing location access to the app means Uber gets it.
  */
 class UberWebChromeClient(
-    private val context: Context,
-    private val locationEnabled: () -> Boolean
+    private val context: Context
 ) : WebChromeClient() {
 
     override fun onGeolocationPermissionsShowPrompt(
         origin: String,
         callback: GeolocationPermissions.Callback
     ) {
-        val allowed = locationEnabled() &&
-            EinkInjector.isInternal(origin) &&
-            LocationProvider(context).hasPermission()
+        val allowed = LocationProvider(context).hasPermission() &&
+            EinkInjector.isInternal(origin)
         callback.invoke(origin, allowed, false)
     }
 
@@ -40,8 +37,6 @@ class UberWebChromeClient(
 
     /** Helper for tests: decide whether a geo request would be granted. */
     fun wouldGrantGeolocation(origin: String, systemPermissionGranted: Boolean): Boolean {
-        return locationEnabled() &&
-            EinkInjector.isInternal(origin) &&
-            systemPermissionGranted
+        return systemPermissionGranted && EinkInjector.isInternal(origin)
     }
 }

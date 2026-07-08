@@ -18,7 +18,8 @@ class UberWebViewClient(
     private val einkEnabled: () -> Boolean,
     private val fontBoostPercent: () -> Int,
     private val onExternalUrl: (String) -> Unit,
-    private val onTripStateChange: (Boolean) -> Unit
+    private val onTripStateChange: (Boolean) -> Unit,
+    private val onLocationReady: () -> Unit = {}
 ) : WebViewClient() {
 
     private val emptyResponse by lazy {
@@ -37,10 +38,10 @@ class UberWebViewClient(
     override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
         val url = request?.url?.toString() ?: return false
         return if (EinkInjector.isInternal(url)) {
-            false // let the WebView load it
+            false
         } else {
             onExternalUrl(url)
-            true // hand off to the system browser
+            true
         }
     }
 
@@ -52,18 +53,19 @@ class UberWebViewClient(
     override fun onPageFinished(view: WebView?, url: String?) {
         super.onPageFinished(view, url)
         if (view == null || url == null) return
-        if (!einkEnabled()) return
-        if (!EinkInjector.shouldInject(url)) return
-        view.evaluateJavascript(EinkInjector.css(fontBoostPercent()), null)
+        if (!EinkInjector.isInternal(url)) return
+        if (einkEnabled() && EinkInjector.shouldInject(url)) {
+            view.evaluateJavascript(EinkInjector.css(fontBoostPercent()), null)
+        }
+        // Re-inject location override on every page load so navigation between
+        // login pages and sub-pages doesn't lose the navigator.geolocation patch.
+        onLocationReady()
     }
 
     override fun onReceivedSslError(view: WebView?, handler: SslErrorHandler?, error: SslError?) {
-        // Never silently proceed - let the page show the cert error so users
-        // can decide. Safer on a privacy-focused device like the Kompakt.
         handler?.cancel()
     }
 
-    /** Match Uber's trip-status URL patterns to toggle keep-screen-on. */
     private fun isTripUrl(url: String): Boolean {
         return url.contains("/trip/") ||
             url.contains("/trips/") ||

@@ -13,7 +13,6 @@ import android.webkit.WebView
 import android.widget.Button
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
-import androidx.core.content.ContextCompat
 
 class MainActivity : AppCompatActivity() {
 
@@ -36,9 +35,11 @@ class MainActivity : AppCompatActivity() {
 
     private val requestLocationPermission =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-            prefs.locationEnabled = granted
-            if (!granted) prefs.locationPromptState = Prefs.PROMPT_NEVER_ASK
-            if (granted) injectLocationIntoActiveWebView()
+            if (granted) {
+                injectLocationIntoActiveWebView()
+            } else {
+                prefs.locationPromptState = Prefs.PROMPT_NEVER_ASK
+            }
         }
 
     @SuppressLint("SetJavaScriptEnabled")
@@ -49,7 +50,6 @@ class MainActivity : AppCompatActivity() {
         prefs = Prefs.of(this)
         locationProvider = LocationProvider(this)
 
-        // No activity-transition animations on e-ink.
         @Suppress("DEPRECATION")
         overridePendingTransition(0, 0)
 
@@ -86,14 +86,13 @@ class MainActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
-        // Re-read prefs in case they changed in SettingsActivity.
         configureWebView(ridesWebView)
         configureWebView(eatsWebView)
         applyKeepScreenOn(inTrip && prefs.screenOnDuringTrip)
 
         if (prefs.shouldShowLocationPrompt()) {
             showLocationOptInDialog()
-        } else if (prefs.locationEnabled && locationProvider.hasPermission()) {
+        } else if (locationProvider.hasPermission()) {
             injectLocationIntoActiveWebView()
         }
     }
@@ -113,7 +112,6 @@ class MainActivity : AppCompatActivity() {
     @Deprecated("Deprecated in Java")
     @SuppressLint("Recycle")
     override fun onBackPressed() {
-        // Back button navigates the active WebView's history before exiting.
         val active = activeWebView()
         if (active.canGoBack()) {
             active.goBack()
@@ -128,9 +126,10 @@ class MainActivity : AppCompatActivity() {
             einkEnabled = { prefs.einkEnabled },
             fontBoostPercent = { prefs.fontBoostPercent },
             onExternalUrl = { url -> openExternal(url) },
-            onTripStateChange = { trip -> onTripStateChange(trip) }
+            onTripStateChange = { trip -> onTripStateChange(trip) },
+            onLocationReady = { injectLocationIntoWebView(wv) }
         )
-        val chrome = UberWebChromeClient(this) { prefs.locationEnabled }
+        val chrome = UberWebChromeClient(this)
         wv.webViewClient = client
         wv.webChromeClient = chrome
     }
@@ -175,26 +174,21 @@ class MainActivity : AppCompatActivity() {
         try {
             startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
         } catch (e: Exception) {
-            // No handler - silently ignore so we don't crash on a privacy-first
-            // device that may not have a browser installed.
         }
     }
 
     private fun showLocationOptInDialog() {
         prefs.locationPromptState = Prefs.PROMPT_SHOWN_AWAITING
-        AlertDialog.Builder(this)
+        AlertDialog.Builder(this, android.R.style.Theme_Material_Light_Dialog_Alert)
             .setTitle(R.string.location_dialog_title)
             .setMessage(R.string.location_dialog_message)
             .setPositiveButton(R.string.location_dialog_allow) { _, _ ->
                 requestLocationPermission.launch(Manifest.permission.ACCESS_FINE_LOCATION)
             }
             .setNegativeButton(R.string.location_dialog_not_now) { _, _ ->
-                prefs.locationEnabled = false
-                // Leave prompt state as SHOWN_AWAITING so we can ask again next launch.
                 prefs.locationPromptState = Prefs.PROMPT_NOT_SHOWN
             }
             .setNeutralButton(R.string.location_dialog_never) { _, _ ->
-                prefs.locationEnabled = false
                 prefs.locationPromptState = Prefs.PROMPT_NEVER_ASK
             }
             .setCancelable(false)
@@ -203,9 +197,14 @@ class MainActivity : AppCompatActivity() {
 
     @SuppressLint("SetTextI18n")
     private fun injectLocationIntoActiveWebView() {
+        injectLocationIntoWebView(activeWebView())
+    }
+
+    private fun injectLocationIntoWebView(wv: WebView) {
         val fix = locationProvider.lastKnownLocation() ?: return
-        val js = EinkInjector.locationHookScript(fix.latitude, fix.longitude)
-        activeWebView().evaluateJavascript(js, null)
+        wv.evaluateJavascript(
+            EinkInjector.locationOverrideScript(fix.latitude, fix.longitude), null
+        )
     }
 
     override fun onRequestPermissionsResult(
@@ -214,8 +213,8 @@ class MainActivity : AppCompatActivity() {
         grantResults: IntArray
     ) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        val granted = grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED
-        prefs.locationEnabled = granted
+        val granted = grantResults.isNotEmpty() &&
+            grantResults[0] == PackageManager.PERMISSION_GRANTED
         if (granted) injectLocationIntoActiveWebView()
     }
 

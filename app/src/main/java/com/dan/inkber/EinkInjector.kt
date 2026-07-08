@@ -20,7 +20,8 @@ object EinkInjector {
         "auth.uber.com",
         "riders.uber.com",
         "www.uber.com",
-        "ubereats.com"
+        "ubereats.com",
+        "www.ubereats.com"
     )
 
     /** Origins whose links may be opened in the in-app WebView (login flows etc). */
@@ -75,6 +76,7 @@ object EinkInjector {
                 body, p, span, div, li, td, th, label, button, a, input, select, textarea, h1, h2, h3, h4, h5, h6 {
                   color: #111111 !important;
                   font-size: ${boost} larger;
+                  line-height: 1.5 !important;
                   text-rendering: optimizeLegibility !important;
                   -webkit-font-smoothing: none !important;
                 }
@@ -85,22 +87,16 @@ object EinkInjector {
                   color: #111111 !important;
                 }
                 img { filter: grayscale(1) contrast(1.08) !important; }
-                /* Leave functional map tiles and overlays alone: Uber's map
-                   canvases carry car icons and route polylines we must not
-                   desaturate. Match by class/role heuristic. */
                 [role='dialog'], [role='alertdialog'] {
                   background: #ffffff !important;
                   color: #111111 !important;
                   border: 1px solid #888888 !important;
                 }
-                /* Hide decorative gradients/blurs that ghost on e-ink. */
                 [style*='blur'], [style*='gradient'], [style*='backdrop-filter'] {
                   background: #ffffff !important;
                   box-shadow: none !important;
                   backdrop-filter: none !important;
                 }
-                /* Soften but keep brand colour on primary action buttons so
-                   users can still tell the main CTA apart. */
                 button[style*='background'], .btn, [class*='primary'] {
                   filter: grayscale(0.35) contrast(1.05) !important;
                 }
@@ -110,6 +106,52 @@ object EinkInjector {
                 }
               `;
               (document.head || document.documentElement).appendChild(s);
+            })();
+        """.trimIndent()
+    }
+
+    /**
+     * JS that overrides navigator.geolocation.getCurrentPosition to return the
+     * device's cached GPS fix. This is what makes Uber's "use current location"
+     * button work — Uber's web app calls the standard browser geolocation API,
+     * and without this override the WebView's geo prompt may not fire or may
+     * return a stale/empty position.
+     *
+     * Also dispatches an 'inkber:location' event for any custom listeners.
+     */
+    fun locationOverrideScript(lat: Double, lon: Double): String {
+        require(lat in -90.0..90.0) { "lat out of range" }
+        require(lon in -180.0..180.0) { "lon out of range" }
+        return """
+            (function(){
+              var pos = {
+                coords: {
+                  latitude: $lat,
+                  longitude: $lon,
+                  accuracy: 1,
+                  altitude: null,
+                  altitudeAccuracy: null,
+                  heading: null,
+                  speed: null
+                },
+                timestamp: Date.now()
+              };
+              var err = { code: 1, message: 'Location not available' };
+              if (navigator.geolocation) {
+                var orig = navigator.geolocation.getCurrentPosition.bind(navigator.geolocation);
+                navigator.geolocation.getCurrentPosition = function(success, failure, opts) {
+                  success(pos);
+                };
+                navigator.geolocation.watchPosition = function(success, failure, opts) {
+                  success(pos);
+                  return 0;
+                };
+              }
+              window.__inkberLoc = pos;
+              try {
+                var evt = new CustomEvent('inkber:location', { detail: pos });
+                window.dispatchEvent(evt);
+              } catch(e) {}
             })();
         """.trimIndent()
     }

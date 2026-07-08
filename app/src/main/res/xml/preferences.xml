@@ -19,11 +19,11 @@
     </PreferenceCategory>
 
     <PreferenceCategory app:title="Location">
-        <SwitchPreferenceCompat
-            app:key="location_enabled"
+        <Preference
+            app:key="location_status"
             app:title="@string/settings_location"
             app:summary="@string/settings_location_summary"
-            app:defaultValue="false" />
+            app:selectable="false" />
     </PreferenceCategory>
 
     <PreferenceCategory app:title="Power">

@@ -22,15 +22,14 @@ class PrefsTest {
 
     @Before fun setup() {
         val ctx = ApplicationProvider.getApplicationContext<Context>()
-        // Clear any prior state.
         ctx.getSharedPreferences("inkber_prefs", Context.MODE_PRIVATE)
             .edit().clear().commit()
         prefs = Prefs.of(ctx)
     }
 
     @Test fun defaultsArePrivacyFirst() {
-        // Location off, e-ink on, screen-on off, prompt not shown.
-        assertFalse(prefs.locationEnabled)
+        // No locationEnabled pref anymore — location is solely the system
+        // permission. E-ink on, screen-on off, prompt not shown.
         assertTrue(prefs.einkEnabled)
         assertFalse(prefs.screenOnDuringTrip)
         assertEquals(Prefs.PROMPT_NOT_SHOWN, prefs.locationPromptState)
@@ -44,11 +43,13 @@ class PrefsTest {
         assertEquals(0, prefs.fontBoostPercent)
     }
 
-    @Test fun shouldShowPromptOnlyWhenNotShownAndLocationOff() {
+    @Test fun shouldShowPromptWhenNotShown() {
+        // Bug 1 fix: no locationEnabled check — prompt shows if not yet shown
+        // and not permanently dismissed.
         assertTrue(prefs.shouldShowLocationPrompt())
-        prefs.locationEnabled = true
-        assertFalse(prefs.shouldShowLocationPrompt())
-        prefs.locationEnabled = false
+    }
+
+    @Test fun shouldNotShowPromptWhenNeverAsk() {
         prefs.locationPromptState = Prefs.PROMPT_NEVER_ASK
         assertFalse(prefs.shouldShowLocationPrompt())
     }
@@ -62,12 +63,10 @@ class PrefsTest {
     }
 
     @Test fun togglesPersist() {
-        prefs.locationEnabled = true
         prefs.einkEnabled = false
         prefs.screenOnDuringTrip = true
         val ctx = ApplicationProvider.getApplicationContext<Context>()
         val again = Prefs.of(ctx)
-        assertTrue(again.locationEnabled)
         assertFalse(again.einkEnabled)
         assertTrue(again.screenOnDuringTrip)
     }

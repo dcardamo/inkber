@@ -7,8 +7,8 @@
     <string name="tab_settings">Settings</string>
     <string name="settings_screen_on_during_trip">Keep screen on during trip</string>
     <string name="settings_screen_on_summary">Prevents the screen sleeping while a ride is in progress</string>
-    <string name="settings_location">Share location with Uber</string>
-    <string name="settings_location_summary">Off by default. When on, precise GPS is shared only with m.uber.com and eats.uber.com to auto-fill your pickup point.</string>
+    <string name="settings_location">Location</string>
+    <string name="settings_location_summary">Location sharing is controlled by Android\'s location permission. Grant it to share your GPS with Uber; deny it to keep location private.</string>
     <string name="settings_eink_mode">E-ink rendering optimisations</string>
     <string name="settings_eink_summary">Force light theme, disable animations, boost contrast and font size</string>
     <string name="settings_font_boost">Font size boost</string>

@@ -102,12 +102,13 @@ class EinkCssDumpTest {
       </div>
       <div class="map-preview">Map preview</div>
       <div class="input-group">
-        <label for="phone">Phone number</label>
-        <input id="phone" type="tel" placeholder="+1 (555) 000-0000">
+        <label for="phone">Phone number or email</label>
+        <input id="phone" type="text" placeholder="Enter phone number or email">
       </div>
       <div class="cta">
         <button>Continue<span class="spinner"></span></button>
       </div>
+      <div class="alt"><a href="#">Use current location</a></div>
       <div class="alt"><a href="#">Use email instead</a></div>
       <div class="footer">By continuing you agree to the Terms.</div>
     </div>
@@ -195,12 +196,11 @@ class EinkCssDumpTest {
     </div>
 
     <div class="category">Location</div>
-    <div class="item">
+    <div class="item info">
       <div class="text">
-        <div class="title">Share location with Uber</div>
-        <div class="summary">Off by default. When on, precise GPS is shared only with m.uber.com and eats.uber.com to auto-fill your pickup point.</div>
+        <div class="title">Location</div>
+        <div class="summary">Location sharing is controlled by Android's location permission. Grant it to share your GPS with Uber; deny it to keep location private.</div>
       </div>
-      <div class="toggle"></div>
     </div>
 
     <div class="category">Power</div>
@@ -216,7 +216,7 @@ class EinkCssDumpTest {
     <div class="item info">
       <div class="text">
         <div class="title">Version</div>
-        <div class="summary">0.1.0</div>
+        <div class="summary">0.1.2</div>
       </div>
     </div>
     <div class="item info">

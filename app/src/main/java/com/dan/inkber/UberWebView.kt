@@ -2,6 +2,7 @@ package com.dan.inkber
 
 import android.content.Context
 import android.util.AttributeSet
+import android.view.MotionEvent
 import android.view.View
 import android.webkit.WebSettings
 import android.webkit.WebView
@@ -57,5 +58,17 @@ class UberWebView @JvmOverloads constructor(
         isHorizontalScrollBarEnabled = false
         isVerticalScrollBarEnabled = true
         scrollBarStyle = View.SCROLLBARS_INSIDE_OVERLAY
+
+        // Bug fix: keyboard doesn't appear when tapping text inputs. The
+        // WebView needs to be focusable in touch mode and must request focus
+        // when touched, otherwise the soft keyboard never shows.
+        isFocusable = true
+        isFocusableInTouchMode = true
+        setOnTouchListener { v, _ ->
+            if (!v.hasFocus()) {
+                v.requestFocus()
+            }
+            false // don't consume the touch; let WebView handle it
+        }
     }
 }
