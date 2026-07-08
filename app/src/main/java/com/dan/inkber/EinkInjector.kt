@@ -49,13 +49,19 @@ object EinkInjector {
     )
 
     /**
-     * The e-ink CSS as pure stylesheet text (no JS wrapper). Used by the
-     * MutationObserver re-injection and the initial injection.
+     * The e-ink CSS as pure stylesheet text (no JS wrapper).
+     *
+     * Key design decisions:
+     * - Use extremely high specificity to override Uber's CSS-in-JS, which
+     *   generates inline styles and class-based overrides with !important.
+     * - Set line-height on every element type explicitly because Uber uses
+     *   compressed line-heights (1.1-1.2) that squish text on e-ink.
+     * - Force light theme via multiple mechanisms: color-scheme, background,
+     *   color, and dark-mode media query override.
+     * - Target common dark-mode class patterns used by Uber Eats's React SPA.
      */
     fun cssText(fontBoostPercent: Int = 15): String {
         require(fontBoostPercent in 0..100) { "fontBoostPercent out of range: $fontBoostPercent" }
-        // Use a fixed rem-based boost instead of "% larger" which compounds
-        // unpredictably across nested elements. A 15% boost = 1.15rem base.
         val rootFontSize = (16 * (1 + fontBoostPercent.toDouble() / 100.0)).toString()
         return """
             :root { color-scheme: light only !important; font-size: ${rootFontSize}px !important; }
@@ -64,22 +70,41 @@ object EinkInjector {
               color: #111111 !important;
               color-scheme: light only !important;
               line-height: 1.5 !important;
+              --bg-color: #ffffff !important;
+              --text-color: #111111 !important;
+              --color-background: #ffffff !important;
+              --color-foreground: #111111 !important;
+              --background-color: #ffffff !important;
+              --foreground-color: #111111 !important;
             }
-            * {
+            *, *::before, *::after {
               animation: none !important;
               transition: none !important;
               scroll-behavior: auto !important;
               line-height: 1.5 !important;
             }
-            body, p, span, div, li, td, th, label, button, a, input, select, textarea, h1, h2, h3, h4, h5, h6 {
+            html, body, div, span, p, a, li, td, th, label, button, input, select, textarea,
+            h1, h2, h3, h4, h5, h6, section, article, header, footer, nav, main, aside,
+            [class], [id] {
               color: #111111 !important;
               line-height: 1.5 !important;
               text-rendering: optimizeLegibility !important;
               -webkit-font-smoothing: none !important;
             }
+            /* Force all backgrounds to white — covers Uber's dark-mode classes,
+               styled-components, and CSS-in-JS inline styles. */
+            html, body, div, section, article, header, footer, nav, main, aside,
+            [class*='dark'], [class*='theme-dark'], [class*='night'], [data-theme='dark'],
+            [class*='background'], [class*='bg-'], [class*='container'], [class*='wrapper'],
+            [class*='card'], [class*='panel'], [class*='sheet'], [class*='modal'],
+            [class*='overlay'], [class*='screen'], [class*='page'], [class*='view'] {
+              background: #ffffff !important;
+              background-color: #ffffff !important;
+            }
             a { color: #000000 !important; text-decoration: underline !important; }
             input, select, textarea, button {
               background: #ffffff !important;
+              background-color: #ffffff !important;
               border-color: #888888 !important;
               color: #111111 !important;
             }
@@ -95,13 +120,19 @@ object EinkInjector {
               backdrop-filter: none !important;
               filter: none !important;
             }
+            /* Override inline background styles that Uber's JS sets. */
+            [style*='background:'], [style*='background-color:'] {
+              background: #ffffff !important;
+              background-color: #ffffff !important;
+            }
             button[style*='background'], .btn, [class*='primary'] {
               filter: grayscale(0.35) contrast(1.05) !important;
             }
             video, [class*='video'], [class*='carousel'] { display: none !important; }
             @media (prefers-color-scheme: dark) {
-              html, body, div, span, p, * {
+              html, body, *, *::before, *::after {
                 background: #ffffff !important;
+                background-color: #ffffff !important;
                 color: #111111 !important;
               }
             }
@@ -116,29 +147,47 @@ object EinkInjector {
      */
     fun css(fontBoostPercent: Int = 15): String {
         require(fontBoostPercent in 0..100) { "fontBoostPercent out of range: $fontBoostPercent" }
-        val css = cssText(fontBoostPercent).replace("\n", "\\n").replace("'", "\\'")
+        val css = cssText(fontBoostPercent).replace("\\", "\\\\").replace("'", "\\'").replace("\n", "\\n")
         return """
             (function(){
               if (window.__inkberInjected) return;
               window.__inkberInjected = true;
               var cssStr = '$css';
               function injectStyle() {
-                if (document.getElementById('inkber-eink')) return;
+                if (document.getElementById('inkber-eink')) {
+                  var existing = document.getElementById('inkber-eink');
+                  existing.textContent = cssStr;
+                  return;
+                }
                 var s = document.createElement('style');
                 s.id = 'inkber-eink';
                 s.textContent = cssStr;
                 (document.head || document.documentElement).appendChild(s);
               }
+              function forceLightTheme() {
+                document.documentElement.setAttribute('data-theme', 'light');
+                document.documentElement.setAttribute('color-scheme', 'light');
+                document.documentElement.style.colorScheme = 'light';
+                if (document.body) {
+                  document.body.setAttribute('data-theme', 'light');
+                  document.body.style.background = '#ffffff';
+                  document.body.style.color = '#111111';
+                  document.body.style.colorScheme = 'light';
+                }
+              }
               injectStyle();
-              // Re-inject when Uber's SPA adds/removes DOM nodes.
+              forceLightTheme();
               if (window.__inkberObserver) return;
               var observer = new MutationObserver(function(mutations) {
                 injectStyle();
+                forceLightTheme();
               });
               if (document.documentElement) {
                 observer.observe(document.documentElement, {
                   childList: true,
-                  subtree: true
+                  subtree: true,
+                  attributes: true,
+                  attributeFilter: ['style', 'class', 'data-theme']
                 });
               }
               window.__inkberObserver = observer;
@@ -148,12 +197,9 @@ object EinkInjector {
 
     /**
      * JS that overrides navigator.geolocation.getCurrentPosition to return the
-     * device's cached GPS fix. This is what makes Uber's "use current location"
-     * button work — Uber's web app calls the standard browser geolocation API,
-     * and without this override the WebView's geo prompt may not fire or may
-     * return a stale/empty position.
-     *
-     * Also dispatches an 'inkber:location' event for any custom listeners.
+     * device's cached GPS fix. Injected as early as possible (onPageStarted)
+     * so that Uber's "use current location" button works even if it calls
+     * getCurrentPosition before onPageFinished.
      */
     fun locationOverrideScript(lat: Double, lon: Double): String {
         require(lat in -90.0..90.0) { "lat out of range" }

@@ -43,7 +43,7 @@ class SettingsActivity : AppCompatActivity() {
             }
 
             findPreference<Preference>("about_version")?.apply {
-                summary = "0.1.4"
+                summary = "0.1.5"
             }
         }
     }

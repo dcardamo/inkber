@@ -212,7 +212,7 @@ class EinkCssDumpTest {
     <div class="item info">
       <div class="text">
         <div class="title">Version</div>
-        <div class="summary">0.1.3</div>
+        <div class="summary">0.1.5</div>
       </div>
     </div>
     <div class="item info">

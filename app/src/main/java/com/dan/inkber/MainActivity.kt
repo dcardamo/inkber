@@ -145,6 +145,11 @@ class MainActivity : AppCompatActivity() {
                 eatsWebView.visibility = View.VISIBLE
             }
         }
+        // Force a layout pass on the newly visible WebView so it measures
+        // correctly and receives touch/scroll events. Without this, a WebView
+        // that was GONEd since onCreate may not scroll when shown.
+        activeWebView().requestLayout()
+        activeWebView().requestFocus()
         updateTabStyles()
     }
 

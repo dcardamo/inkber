@@ -62,12 +62,13 @@ class UberWebView @JvmOverloads constructor(
         isHorizontalScrollBarEnabled = false
         isVerticalScrollBarEnabled = true
         scrollBarStyle = View.SCROLLBARS_INSIDE_OVERLAY
+        isScrollContainer = true
 
         isFocusable = true
         isFocusableInTouchMode = true
         setOnTouchListener { v, _ ->
             if (!v.hasFocus()) v.requestFocus()
-            false
+            false // let the WebView handle the touch (scroll, tap, etc.)
         }
     }
 

@@ -18,6 +18,10 @@ import java.io.ByteArrayInputStream
  * Uber is a JS SPA that renders content after onPageFinished. The CSS
  * injection script also sets up a MutationObserver to re-inject when Uber's
  * JS dynamically adds DOM nodes.
+ *
+ * Location override is injected on onPageStarted (before the page's JS runs)
+ * so that navigator.geolocation.getCurrentPosition is patched before Uber's
+ * code calls it.
  */
 class UberWebViewClient(
     private val einkEnabled: () -> Boolean,
@@ -57,19 +61,21 @@ class UberWebViewClient(
         view?.evaluateJavascript(
             "try{delete window.__inkberInjected;if(window.__inkberObserver){window.__inkberObserver.disconnect();delete window.__inkberObserver;}}catch(e){}", null
         )
+        // Inject location override BEFORE the page's JS runs so that
+        // navigator.geolocation.getCurrentPosition is patched before Uber
+        // calls it for "use current location".
+        if (url != null && EinkInjector.isInternal(url)) {
+            onLocationReady()
+        }
     }
 
     override fun onPageCommitVisible(view: WebView?, url: String?) {
         super.onPageCommitVisible(view, url)
-        // This fires after the page is visually rendered — better timing for
-        // Uber's SPA which renders most content via JS after onPageFinished.
         injectEinkAndLocation(view, url)
     }
 
     override fun onPageFinished(view: WebView?, url: String?) {
         super.onPageFinished(view, url)
-        // Also inject on onPageFinished as a fallback for pages where
-        // onPageCommitVisible didn't fire or fired too early.
         injectEinkAndLocation(view, url)
     }
 
